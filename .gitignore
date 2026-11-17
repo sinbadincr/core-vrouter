@@ -1,0 +1,30 @@
+# ---- AI coding agents ----
+# Claude Code
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.mcp.json
+
+# Spec Kit
+.specify/
+
+# Other agents
+AGENTS.md
+.cursor/
+.cursorrules
+.windsurf/
+.windsurfrules
+.gemini/
+GEMINI.md
+.codex/
+.aider*
+.continue/
+.copilot/
+.github/copilot-instructions.md
+.github/prompts/
+.github/agents/
+.roo/
+.clinerules
+.kiro/
+.qwen/
+.opencode/
