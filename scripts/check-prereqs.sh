@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Verify the tools needed to build, test and run the lab.
 set -u
+export PATH="$PATH:/usr/sbin:/sbin" # arping, sysctl, ... live here on Debian
 need="gcc clang cmake gdb ip arping tcpdump iperf3 socat jq python3"
 # `--e2e`: only what `make e2e` itself needs (the suite crafts packets with scapy)
 [ "${1:-}" = "--e2e" ] && need="gcc cmake ip socat jq python3"
