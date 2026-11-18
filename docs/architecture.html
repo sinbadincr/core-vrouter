@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>minivr Architecture</title>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --surface-2: #f0efeb;
+    --text: #1d1d1b;
+    --muted: #66655f;
+    --line: #8a8982;
+    --border: #d9d8d2;
+    --accent: #2f6fdb;
+    --accent-soft: #e3ecfb;
+    --accent-text: #1f4fa3;
+    --ok: #2e8a57;
+    --ok-soft: #e2f3e9;
+    --drop: #c2462e;
+    --drop-soft: #fbe7e2;
+    --info-soft: #fdf3dc;
+    --info: #9a6b00;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161615;
+      --surface: #1f1f1d;
+      --surface-2: #2a2a27;
+      --text: #ecebe6;
+      --muted: #a3a29b;
+      --line: #8d8c85;
+      --border: #3a3a36;
+      --accent: #6d9ff0;
+      --accent-soft: #1f2d45;
+      --accent-text: #a9c6f7;
+      --ok: #5fbf88;
+      --ok-soft: #1c3226;
+      --drop: #ec7d65;
+      --drop-soft: #3b211b;
+      --info-soft: #3a2f14;
+      --info: #e3b54f;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161615;
+    --surface: #1f1f1d;
+    --surface-2: #2a2a27;
+    --text: #ecebe6;
+    --muted: #a3a29b;
+    --line: #8d8c85;
+    --border: #3a3a36;
+    --accent: #6d9ff0;
+    --accent-soft: #1f2d45;
+    --accent-text: #a9c6f7;
+    --ok: #5fbf88;
+    --ok-soft: #1c3226;
+    --drop: #ec7d65;
+    --drop-soft: #3b211b;
+    --info-soft: #3a2f14;
+    --info: #e3b54f;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  code { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 0.9em; }
+  main { max-width: 1040px; margin: 0 auto; padding: 40px 16px 80px; }
+  header h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); max-width: 70ch; }
+  nav { margin: 24px 0 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+  nav a {
+    color: var(--text); text-decoration: none; font-size: 0.875rem;
+    padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface);
+  }
+  nav a:hover { border-color: var(--accent); color: var(--accent-text); }
+  section { margin-top: 56px; }
+  h2 { font-size: 1.35rem; margin: 0 0 6px; }
+  h2 .num { color: var(--muted); font-weight: 500; margin-right: 6px; }
+  h3 { font-size: 1.05rem; margin: 28px 0 12px; }
+  .lede { color: var(--muted); margin: 0 0 20px; max-width: 75ch; }
+
+  figure {
+    margin: 0; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 16px; overflow-x: auto;
+  }
+  figcaption { color: var(--muted); font-size: 0.875rem; margin-top: 12px; }
+  .mmd { display: flex; justify-content: center; min-height: 80px; }
+  .mmd svg { max-width: 100% !important; height: auto; }
+  .mmd.wide svg { min-width: 640px; }
+  .mmd-fallback {
+    white-space: pre; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.8rem;
+    color: var(--muted); margin: 0; overflow-x: auto; width: 100%;
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; font-size: 0.8rem; }
+  .legend span { padding: 2px 8px; border-radius: 6px; }
+  .lg-ok { color: var(--ok); background: var(--ok-soft); }
+  .lg-drop { color: var(--drop); background: var(--drop-soft); }
+  .lg-info { color: var(--info); background: var(--info-soft); }
+  .lg-acc { color: var(--accent-text); background: var(--accent-soft); }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .stat b { display: block; font-size: 1.5rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 0.85rem; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.925rem; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-weight: 600; background: var(--surface-2); }
+  tr:last-child td { border-bottom: none; }
+
+  .theme-toggle {
+    position: fixed; top: 12px; right: 12px; z-index: 5;
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 0.8rem; cursor: pointer;
+  }
+  footer { margin-top: 64px; color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--border); padding-top: 16px; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" type="button" id="themeToggle" aria-label="Toggle colour theme">Theme</button>
+<main>
+  <header>
+    <h1>minivr architecture</h1>
+    <p>Phase 1: a single-node lab and <code>minivrd</code>, a single-threaded C17 L3 forwarder modelled on
+       Tungsten Fabric's vRouter, plus the <code>vrctl</code> CLI. Source of truth:
+       <code>specs/001-lab-l3-forwarder/</code> (spec, plan, research, contracts).</p>
+    <nav aria-label="Sections">
+      <a href="#lab">1 · Lab topology</a>
+      <a href="#modules">2 · Inside minivrd</a>
+      <a href="#packet">3 · Packet path</a>
+      <a href="#example">4 · Example: vm1 pings vm2</a>
+      <a href="#control">5 · Control path</a>
+      <a href="#seams">6 · Seams</a>
+      <a href="#tf">7 · Relation to Tungsten Fabric</a>
+      <a href="#testing">8 · Testing</a>
+    </nav>
+  </header>
+
+  <!-- 1. LAB TOPOLOGY -->
+  <section id="lab">
+    <h2><span class="num">1</span>Lab topology</h2>
+    <p class="lede">Every "VM" is a network namespace linked to the compute node by a veth pair. The ports in
+      <code>mvr-cn1</code> carry no IP address and IP forwarding is off, so the kernel neither routes nor answers
+      ARP. Every frame goes through <code>minivrd</code>.</p>
+    <figure>
+      <div class="mmd wide" data-src="mmd-topology" role="img" aria-label="Lab topology diagram"></div>
+      <figcaption>p1 and p2 share gateway 10.0.1.1/24 (anycast gateway, as vRouter presents on every VM interface).
+        vm1 and vm2 are reached through per-VM <code>/32</code> host routes created from static neighbours.
+        MACs are deterministic: ports <code>02:00:00:00:00:0N</code>, VMs <code>02:00:00:00:01:0N</code>.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 2. MODULES -->
+  <section id="modules">
+    <h2><span class="num">2</span>Inside minivrd</h2>
+    <p class="lede">One process, one thread, one <code>epoll</code> loop. The forwarding logic in <code>dp/</code> makes
+      no system calls, so it can be unit-tested with a fake clock and a fake I/O backend.</p>
+    <figure>
+      <div class="mmd wide" data-src="mmd-modules" role="img" aria-label="Module diagram of minivrd"></div>
+      <figcaption><code>dp/</code>, <code>common/</code> and <code>ctl/cmd.c</code> build into the static library
+        <code>libminivr_dp</code>, which is linked by <code>minivrd</code>, <code>vrctl</code> and the unit tests.
+        Dashed: planned for phase 4.</figcaption>
+    </figure>
+
+    <div class="table-wrap" style="margin-top:16px">
+      <table>
+        <thead><tr><th>Module</th><th>Responsibility</th></tr></thead>
+        <tbody>
+          <tr><td><code>pkt_eth.c</code></td><td>Ethernet classify, L2 checks; non-ARP broadcast/multicast dropped</td></tr>
+          <tr><td><code>pkt_arp.c</code></td><td>ARP validate, proxy reply for known neighbours, build ARP requests</td></tr>
+          <tr><td><code>pkt_ipv4.c</code></td><td>IPv4 validate (length, IHL, checksum, fragments), TTL decrement, checksum update</td></tr>
+          <tr><td><code>pkt_icmp.c</code></td><td>Echo reply; build unreachable, time exceeded, fragmentation needed</td></tr>
+          <tr><td><code>antispoof.c</code></td><td>Drop IPv4/ARP whose source IP/MAC does not match the ingress port's binding</td></tr>
+          <tr><td><code>route.c</code> + <code>lpm_trie.c</code></td><td>Connected, <code>/32</code> host and static routes; longest-prefix match on a binary trie</td></tr>
+          <tr><td><code>neigh.c</code></td><td>Open-addressing hash table, neighbour state machine, hold queue (≤ 3 packets), ARP retry/expiry</td></tr>
+          <tr><td><code>ratelimit.c</code></td><td>Token bucket for ICMP errors, one per ingress port</td></tr>
+          <tr><td><code>stats.c</code></td><td>Per-port counters, per-drop-reason counters, event counters</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- KEY NUMBERS -->
+  <section id="numbers" aria-label="Key capacities">
+    <h2><span class="num">·</span>Fixed capacities</h2>
+    <p class="lede">All tables are sized at start-up and never grow. A full table rejects CLI changes with an
+      error; neighbours learned while the table is full are counted, not stored.</p>
+    <div class="stats">
+      <div class="stat"><b>16</b><span>ports</span></div>
+      <div class="stat"><b>10,000</b><span>routes</span></div>
+      <div class="stat"><b>1,024</b><span>neighbours</span></div>
+      <div class="stat"><b>4,096</b><span>mbufs × 2 KiB</span></div>
+      <div class="stat"><b>32</b><span>packets per burst</span></div>
+      <div class="stat"><b>3</b><span>held packets per unresolved neighbour</span></div>
+      <div class="stat"><b>100/s</b><span>ICMP errors per port, burst 20</span></div>
+    </div>
+  </section>
+
+  <!-- 3. PACKET PATH -->
+  <section id="packet">
+    <h2><span class="num">3</span>Packet path (one burst)</h2>
+    <p class="lede">Run-to-completion: each received frame goes through these checks, then the transmit batches are
+      flushed per egress port. Every drop increments exactly one named reason.</p>
+    <figure>
+      <div class="mmd" data-src="mmd-packet" role="img" aria-label="Packet path flowchart"></div>
+      <div class="legend">
+        <span class="lg-ok">delivered / replied</span>
+        <span class="lg-drop">dropped (named reason)</span>
+        <span class="lg-info">held, waiting for ARP</span>
+        <span class="lg-acc">* ICMP error, rate-limited per port</span>
+      </div>
+    </figure>
+  </section>
+
+  <!-- 4. EXAMPLE -->
+  <section id="example">
+    <h2><span class="num">4</span>Example: vm1 pings vm2</h2>
+    <p class="lede">vm1 and vm2 are in the same /24 but on different ports, so the forwarder answers ARP on vm2's behalf
+      and routes the packet. There is no L2 bridge between them.</p>
+    <figure>
+      <div class="mmd wide" data-src="mmd-example" role="img" aria-label="Sequence diagram of vm1 pinging vm2"></div>
+    </figure>
+  </section>
+
+  <!-- 5. CONTROL PATH -->
+  <section id="control">
+    <h2><span class="num">5</span>Control path</h2>
+    <p class="lede">The CLI and the start-up config share one command grammar and one parser. Because there is a single
+      thread, a command is applied between two bursts: no locks, no RCU, and forwarding never stops.</p>
+    <figure>
+      <div class="mmd wide" data-src="mmd-control" role="img" aria-label="Sequence diagram of a vrctl command"></div>
+      <figcaption>Wire format and auth rules: <code>contracts/control-protocol.md</code>. Command grammar and exit codes:
+        <code>contracts/cli.md</code>.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 6. SEAMS -->
+  <section id="seams">
+    <h2><span class="num">6</span>Seams for later phases</h2>
+    <p class="lede">These interfaces are kept narrow on purpose, so later phases can replace an implementation without
+      touching the rest.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Seam</th><th>Phase 1</th><th>Replaced later by</th></tr></thead>
+        <tbody>
+          <tr><td><code>pio_ops</code> (I/O backend)</td><td>AF_PACKET + <code>recvmmsg</code>/<code>sendmmsg</code></td><td>DPDK backend (phase 4)</td></tr>
+          <tr><td><code>dp/</code> has no syscalls</td><td>Unit tests with fake clock and fake backend</td><td>Same code under multi-core workers</td></tr>
+          <tr><td><code>lpm.h</code> (route lookup)</td><td>Binary trie</td><td>DIR-24-8, measured before/after (phase 4)</td></tr>
+          <tr><td>Single event loop</td><td>CLI changes applied between bursts</td><td>RCU-style table swap with multi-core (phase 4)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 7. TUNGSTEN FABRIC -->
+  <section id="tf">
+    <h2><span class="num">7</span>Relation to Tungsten Fabric</h2>
+    <p class="lede">minivr rebuilds, at small scale, the part of Tungsten Fabric (TF) that runs on every compute node:
+      the vRouter forwarder. Phase 1 builds only that part, on one node. The TF controller and vrouter-agent are
+      replaced by a static config file that pre-loads what they would normally push down.</p>
+
+    <h3>7.1 Tungsten Fabric architecture</h3>
+    <figure>
+      <div class="mmd wide" data-src="mmd-tf" role="img" aria-label="Tungsten Fabric architecture diagram"></div>
+      <figcaption>The orchestrator creates VMs and networks through the config API. Control nodes turn that intent into
+        routes and push them over XMPP to the vrouter-agent on each compute node, which programs the vRouter forwarder.
+        Traffic between compute nodes travels in overlay tunnels; control nodes peer with gateway routers over BGP.
+        The highlighted box is what minivr rebuilds.</figcaption>
+    </figure>
+
+    <h3>7.2 What minivr covers, phase by phase</h3>
+    <figure>
+      <div class="mmd wide" data-src="mmd-map" role="img" aria-label="Mapping of Tungsten Fabric components to minivr phases"></div>
+      <div class="legend">
+        <span class="lg-acc">built in phase 1</span>
+        <span class="lg-info">later phase</span>
+      </div>
+      <figcaption>Phase numbers come from the specs: encap headroom is reserved for phase 2 (<code>data-model.md</code>),
+        the agent/controller arrives in phase 3 (<code>spec.md</code>), multi-core, DPDK and DIR-24-8 in phase 4
+        (<code>plan.md</code>, <code>research.md</code>). The specs list VRFs and BGP only as "phases 2–5" without
+        a specific phase.</figcaption>
+    </figure>
+
+    <h3>7.3 Behaviour mapping</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>minivr</th><th>Tungsten Fabric</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td><code>minivrd</code></td><td>vRouter forwarder (kernel module / DPDK)</td><td>Looks up tables pushed from above; does not guess</td></tr>
+          <tr><td><code>lab/cn1.conf</code></td><td>Controller + vrouter-agent</td><td>Pre-loads each VM's IP→MAC and <code>/32</code> route, as the agent would</td></tr>
+          <tr><td><code>lab.sh</code> (namespaces, veth)</td><td>Orchestrator (Nova / Kubernetes) creating VMs and tap interfaces</td><td>Creates the endpoints; does not program forwarding</td></tr>
+          <tr><td>Port <code>p1..p3</code></td><td><code>vif</code> (tap interface of a VM)</td><td>One per VM, with its own counters</td></tr>
+          <tr><td><code>vrctl</code></td><td><code>vif</code>, <code>rt</code>, <code>nh</code>, <code>dropstats</code> CLIs</td><td>Inspect and change state at runtime</td></tr>
+          <tr><td>Proxy ARP only for known neighbours</td><td>Proxy using the route's flags and stitched MAC</td><td>TF floods unknown targets if the route has the flood flag; minivr drops them (FR-007 forbids forwarding ARP)</td></tr>
+          <tr><td>Anycast gateway on p1/p2</td><td>Same gateway IP/MAC on every VM interface</td><td>L3-only model, no learning bridge</td></tr>
+          <tr><td><code>source_spoofed</code> drop</td><td><code>VP_DROP_INVALID_SOURCE</code></td><td>Source must match the interface</td></tr>
+          <tr><td>Named drop reasons</td><td><code>dropstats</code> counters</td><td>Every drop is attributed to one reason</td></tr>
+          <tr><td>Fixed table sizes</td><td>Table sizes set at module load</td><td>No allocation on the packet path</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 8. TESTING -->
+  <section id="testing">
+    <h2><span class="num">8</span>Testing</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Layer</th><th>Tooling</th><th>Covers</th></tr></thead>
+        <tbody>
+          <tr><td>Unit</td><td>CTest + in-repo harness, linked against <code>libminivr_dp</code></td><td>Parsers with byte vectors (good and malformed), LPM vs oracle, neighbour FSM, rate limiter, command parser</td></tr>
+          <tr><td>Sanitizers</td><td>ASan + UBSan, TSan presets; GCC and Clang with <code>-Werror</code></td><td>Memory errors and undefined behaviour</td></tr>
+          <tr><td>End-to-end</td><td><code>make e2e</code>: pytest + scapy as root</td><td>Lab up → <code>minivrd</code> → checks V1–V17 → lab down, host snapshot diff</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Generated from <code>specs/001-lab-l3-forwarder/</code> (plan.md, research.md, data-model.md, contracts/).
+    The specs are the source of truth; update this page when they change. Diagrams are rendered with Mermaid
+    (loaded from a CDN); without network access the diagram source is shown instead.
+  </footer>
+</main>
+
+<!-- ================= Mermaid sources ================= -->
+<script type="text/plain" id="mmd-topology">
+flowchart LR
+  subgraph HOST["Host · Debian 13 VM"]
+    direction LR
+    subgraph VMS["VM namespaces"]
+      direction TB
+      vm1["<b>mvr-vm1</b><br/>eth0 10.0.1.11/24<br/>gw 10.0.1.1"]
+      vm2["<b>mvr-vm2</b><br/>eth0 10.0.1.12/24<br/>gw 10.0.1.1"]
+      vm3["<b>mvr-vm3</b><br/>eth0 10.0.2.13/24<br/>gw 10.0.2.1"]
+    end
+    subgraph CN1["mvr-cn1 · compute node (ip_forward=0, ports without IP)"]
+      direction LR
+      subgraph PORTS["ports"]
+        direction TB
+        p1["<b>p1</b><br/>gw 10.0.1.1/24"]
+        p2["<b>p2</b><br/>gw 10.0.1.1/24"]
+        p3["<b>p3</b><br/>gw 10.0.2.1/24"]
+      end
+      fwd(["<b>minivrd</b><br/>L3 forwarder<br/>AF_PACKET · 1 thread"]):::accent
+      cli["vrctl"]
+      p1 <--> fwd
+      p2 <--> fwd
+      p3 <--> fwd
+      cli -- "Unix socket" --> fwd
+    end
+    ens33["ens33<br/>management NIC<br/>never touched"]:::muted
+    vm1 ---|veth| p1
+    vm2 ---|veth| p2
+    vm3 ---|veth| p3
+  end
+  classDef accent fill:{{accentSoft}},stroke:{{accent}},stroke-width:2px,color:{{accentText}}
+  classDef muted fill:{{surface}},stroke:{{line}},stroke-dasharray:4 4,color:{{muted}}
+</script>
+
+<script type="text/plain" id="mmd-modules">
+flowchart TB
+  vrctl(["vrctl"])
+  conf[/"lab/cn1.conf"/]
+
+  subgraph MV["minivrd · single thread"]
+    direction TB
+    subgraph DAEMON["daemon/"]
+      direction LR
+      main["main.c<br/>epoll · signalfd · timerfd 10 ms"]
+      linkmon["linkmon.c<br/>rtnetlink → port up/down"]
+      crash["crash.c<br/>core dumps · backtrace"]
+    end
+    subgraph CTL["ctl/"]
+      direction LR
+      srv["ctl_server.c<br/>Unix socket · SO_PEERCRED"]
+      cmd["cmd.c<br/>one grammar: CLI + config"]
+      cfg["config.c<br/>config loader"]
+    end
+    subgraph DP["dp/ · forwarding logic, no syscalls"]
+      direction TB
+      fwd["<b>forward.c</b><br/>per-burst pipeline"]:::accent
+      subgraph PARSE["packet handlers"]
+        direction LR
+        eth["pkt_eth.c"]
+        arp["pkt_arp.c"]
+        ipv4["pkt_ipv4.c"]
+        icmp["pkt_icmp.c"]
+        spoof["antispoof.c"]
+      end
+      subgraph STATE["state"]
+        direction LR
+        route["route.c<br/>+ lpm_trie.c"]
+        neigh["neigh.c"]
+        rl["ratelimit.c"]
+        stats["stats.c"]
+      end
+      fwd --> PARSE
+      fwd --> STATE
+    end
+    subgraph PIO["pio/ · backend interface"]
+      direction LR
+      ops["pio_ops<br/>open · rx_burst · tx_burst<br/>get_mac · get_mtu · fd"]
+      af["pio_afpacket.c<br/>recvmmsg / sendmmsg"]
+      dpdk["pio_dpdk.c<br/>(phase 4)"]:::future
+      af -. implements .-> ops
+      dpdk -. implements .-> ops
+    end
+    common["common/<br/>mbuf.c (4096 × 2 KiB) · log.c · clock.c · json_out.c"]
+  end
+
+  vrctl --> srv
+  conf --> cfg
+  srv --> cmd
+  cfg --> cmd
+  cmd -- "changes between bursts" --> STATE
+  main -- "runs each burst" --> fwd
+  linkmon -- "oper state" --> STATE
+  fwd <-->|"mbuf bursts (≤ 32)"| ops
+  af <--> p1["p1"]
+  af <--> p2["p2"]
+  af <--> p3["p3"]
+
+  classDef accent fill:{{accentSoft}},stroke:{{accent}},stroke-width:2px,color:{{accentText}}
+  classDef future fill:{{surface}},stroke:{{line}},stroke-dasharray:4 4,color:{{muted}}
+</script>
+
+<script type="text/plain" id="mmd-packet">
+flowchart TD
+  rx(["Receive burst<br/>pio.rx_burst() ≤ 32 mbufs"]):::accent --> eth{"Ethernet<br/>frame OK?"}
+  eth -- "no" --> d1["drop: bad / unsupported /<br/>non-ARP broadcast"]:::drop
+  eth -- "yes" --> spoof{"Source matches<br/>port binding?"}
+  spoof -- "mismatch" --> d2["drop: source_spoofed"]:::drop
+  spoof -- "ok or unbound" --> type{"EtherType"}
+
+  type -- "ARP" --> arp{"Target IP<br/>known?"}
+  arp -- "yes" --> arpok["Proxy ARP reply"]:::ok
+  arp -- "no" --> d3["drop: arp_unknown_target"]:::drop
+
+  type -- "IPv4" --> ipv{"Header<br/>valid?"}
+  ipv -- "no" --> d4["drop: named reason"]:::drop
+  ipv -- "yes" --> local{"Destination is<br/>forwarder IP?"}
+  local -- "ICMP echo" --> echo["Echo reply"]:::ok
+  local -- "other" --> d5["drop: local_unsupported"]:::drop
+  local -- "no" --> ttl{"TTL ≤ 1?"}
+  ttl -- "yes" --> d6["Time exceeded *<br/>drop: ttl_exceeded"]:::drop
+  ttl -- "no" --> lpm{"LPM<br/>route?"}
+  lpm -- "miss" --> d7["Unreachable *<br/>drop: no_route"]:::drop
+  lpm -- "hit" --> egr{"Egress up and<br/>within MTU?"}
+  egr -- "down" --> d8["drop: port_down"]:::drop
+  egr -- "too big" --> d9["Frag needed *<br/>drop: mtu_exceeded"]:::drop
+  egr -- "ok" --> nb{"Neighbour<br/>state"}
+  nb -- "REACHABLE" --> fwd["Rewrite MACs · TTL − 1<br/>checksum → tx batch"]:::ok
+  nb -- "INCOMPLETE / none" --> hold["Hold (≤ 3) + send ARP"]:::info
+  hold -- "queue full or timeout" --> d10["drop: neighbour_unresolved"]:::drop
+  fwd --> tx(["pio.tx_burst()<br/>per egress port"]):::accent
+
+  classDef accent fill:{{accentSoft}},stroke:{{accent}},stroke-width:2px,color:{{accentText}}
+  classDef ok fill:{{okSoft}},stroke:{{ok}},color:{{text}}
+  classDef drop fill:{{dropSoft}},stroke:{{drop}},color:{{text}}
+  classDef info fill:{{infoSoft}},stroke:{{info}},color:{{text}}
+</script>
+
+<script type="text/plain" id="mmd-example">
+sequenceDiagram
+  autonumber
+  participant vm1 as vm1 · 10.0.1.11 (p1)
+  participant fw as minivrd
+  participant vm2 as vm2 · 10.0.1.12 (p2)
+  vm1->>fw: ARP who-has 10.0.1.12 (broadcast on p1)
+  Note over fw: source matches p1 binding ✓<br/>10.0.1.12 is a known neighbour (static)
+  fw-->>vm1: ARP reply: 10.0.1.12 is at p1's MAC (proxy)
+  Note over vm2: vm2 never sees vm1's ARP request
+  vm1->>fw: ICMP echo request → 10.0.1.12 (dst MAC = p1)
+  Note over fw: LPM hits /32 host route via p2<br/>TTL − 1 · checksum · rewrite MACs
+  fw->>vm2: ICMP echo request (src MAC = p2, dst MAC = vm2)
+  vm2->>fw: ICMP echo reply → 10.0.1.11 (dst MAC = p2)
+  Note over fw: /32 host route via p1
+  fw->>vm1: ICMP echo reply (src MAC = p1)
+</script>
+
+<script type="text/plain" id="mmd-control">
+sequenceDiagram
+  participant U as vrctl
+  participant S as ctl_server.c
+  participant C as cmd.c
+  participant T as port / route / neigh tables
+  Note over C,T: At start-up, lab/cn1.conf goes through the same cmd.c
+  U->>S: framed request (Unix socket, mode 0600)
+  S->>S: check caller uid (SO_PEERCRED)
+  S->>C: parse command
+  alt invalid input or table full
+    C-->>S: error
+    S-->>U: error message · exit ≠ 0 · state unchanged
+  else valid
+    C->>T: apply change (between two bursts)
+    C-->>S: result
+    S-->>U: human-readable table or JSON (-j)
+  end
+</script>
+
+<script type="text/plain" id="mmd-tf">
+flowchart TB
+  subgraph ORCH["Orchestrator"]
+    direction LR
+    os["OpenStack<br/>Nova · Neutron plugin"]
+    k8s["Kubernetes<br/>kube-manager · CNI"]
+  end
+
+  subgraph CTRL["TF controller · HA cluster, usually 3 nodes"]
+    direction LR
+    subgraph CFG["Config"]
+      direction TB
+      api["config-api<br/>REST"]
+      st["schema-transformer<br/>svc-monitor · device-manager"]
+      db[("Cassandra · ZooKeeper<br/>RabbitMQ")]
+    end
+    subgraph CTLN["Control"]
+      direction TB
+      control["control<br/>route reflector<br/>XMPP · BGP"]
+      dns["dns · named"]
+    end
+    subgraph ANA["Analytics (optional)"]
+      direction TB
+      coll["collector<br/>analytics-api"]
+    end
+    webui["Web UI"]
+  end
+
+  subgraph CN1["Compute node 1"]
+    direction TB
+    agent1["vrouter-agent<br/>user space"]
+    vr1["vRouter forwarder<br/>kernel module or DPDK<br/>VRFs · routes · nexthops · flows"]:::accent
+    vmA["VM A"]
+    vmB["VM B"]
+    agent1 -- "netlink: program tables" --> vr1
+    vr1 -. "pkt0: trapped packets<br/>ARP · DHCP · flow setup" .-> agent1
+    vmA ---|"tap (vif)"| vr1
+    vmB ---|"tap (vif)"| vr1
+  end
+
+  subgraph CN2["Compute node 2"]
+    direction TB
+    agent2["vrouter-agent"]
+    vr2["vRouter forwarder"]:::accent
+    vmC["VM C"]
+    agent2 -- "netlink" --> vr2
+    vmC ---|"tap (vif)"| vr2
+  end
+
+  gw["SDN gateway router<br/>e.g. Juniper MX"]
+
+  os -- "REST" --> api
+  k8s -- "REST" --> api
+  api --> db
+  st --> db
+  control -- "reads config" --> db
+  webui --> api
+  control <-->|"XMPP: routes, config"| agent1
+  control <-->|"XMPP"| agent2
+  control <-->|"BGP"| gw
+  vr1 <==>|"overlay: MPLSoUDP · MPLSoGRE · VXLAN"| vr2
+  vr2 <==>|"overlay"| gw
+  agent1 -. "stats (UVE)" .-> coll
+
+  classDef accent fill:{{accentSoft}},stroke:{{accent}},stroke-width:2px,color:{{accentText}}
+</script>
+
+<script type="text/plain" id="mmd-map">
+flowchart LR
+  subgraph TF["Tungsten Fabric"]
+    direction TB
+    t1["Orchestrator<br/>creates VMs and tap interfaces"]
+    t2["Controller + vrouter-agent<br/>push routes and IP→MAC"]
+    t3["vRouter forwarder<br/>proxy ARP · LPM · anti-spoofing · dropstats"]
+    t4["vif / rt / nh / dropstats CLIs"]
+    t5["Overlay tunnels between compute nodes"]
+    t6["VRFs, one per virtual network · BGP"]
+    t7["DPDK forwarder, multi-core"]
+  end
+  subgraph MV["minivr"]
+    direction TB
+    m1["lab.sh<br/>namespaces + veth"]:::p1
+    m2["lab/cn1.conf<br/>static ports, neighbours, /32 routes"]:::p1
+    m3["minivrd<br/>single-thread L3 forwarder"]:::p1
+    m4["vrctl"]:::p1
+    m5["Encapsulation / overlay<br/>phase 2"]:::later
+    m6["Agent / controller<br/>phase 3"]:::later
+    m7["DPDK backend · multi-core · DIR-24-8<br/>phase 4"]:::later
+    m8["VRFs · BGP<br/>phases 2–5"]:::later
+  end
+  t1 -.- m1
+  t2 -.-|"today"| m2
+  t2 -.-|"later"| m6
+  t3 -.- m3
+  t4 -.- m4
+  t5 -.- m5
+  t6 -.- m8
+  t7 -.- m7
+
+  classDef p1 fill:{{accentSoft}},stroke:{{accent}},stroke-width:2px,color:{{text}}
+  classDef later fill:{{infoSoft}},stroke:{{info}},stroke-dasharray:4 4,color:{{text}}
+</script>
+
+<script type="module">
+  const root = document.documentElement;
+  const blocks = Array.from(document.querySelectorAll('.mmd'));
+
+  function palette() {
+    const cs = getComputedStyle(root);
+    const v = (n) => cs.getPropertyValue(n).trim();
+    return {
+      bg: v('--bg'), surface: v('--surface'), surface2: v('--surface-2'), text: v('--text'),
+      muted: v('--muted'), line: v('--line'), border: v('--border'),
+      accent: v('--accent'), accentSoft: v('--accent-soft'), accentText: v('--accent-text'),
+      ok: v('--ok'), okSoft: v('--ok-soft'), drop: v('--drop'), dropSoft: v('--drop-soft'),
+      info: v('--info'), infoSoft: v('--info-soft')
+    };
+  }
+
+  function sourceFor(el, p) {
+    const raw = document.getElementById(el.dataset.src).textContent;
+    return raw.replace(/\{\{(\w+)\}\}/g, (_, k) => p[k] || '');
+  }
+
+  function showFallback() {
+    const p = palette();
+    blocks.forEach((el) => {
+      el.innerHTML = '';
+      const pre = document.createElement('pre');
+      pre.className = 'mmd-fallback';
+      pre.textContent = sourceFor(el, p);
+      el.appendChild(pre);
+    });
+  }
+
+  let mermaid = null;
+  try {
+    mermaid = (await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs')).default;
+  } catch (e) {
+    showFallback();
+  }
+
+  let seq = 0;
+  async function render() {
+    if (!mermaid) return;
+    const p = palette();
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: 'base',
+      fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+      themeVariables: {
+        background: p.surface,
+        fontSize: '14px',
+        primaryColor: p.surface,
+        primaryTextColor: p.text,
+        primaryBorderColor: p.border,
+        secondaryColor: p.surface2,
+        tertiaryColor: p.surface2,
+        lineColor: p.line,
+        textColor: p.text,
+        mainBkg: p.surface,
+        nodeBorder: p.line,
+        clusterBkg: p.surface2,
+        clusterBorder: p.border,
+        titleColor: p.text,
+        edgeLabelBackground: p.surface,
+        actorBkg: p.accentSoft,
+        actorBorder: p.accent,
+        actorTextColor: p.text,
+        actorLineColor: p.line,
+        signalColor: p.text,
+        signalTextColor: p.text,
+        labelBoxBkgColor: p.surface2,
+        labelBoxBorderColor: p.border,
+        labelTextColor: p.text,
+        loopTextColor: p.text,
+        noteBkgColor: p.infoSoft,
+        noteTextColor: p.text,
+        noteBorderColor: p.info,
+        activationBkgColor: p.surface2,
+        sequenceNumberColor: p.surface
+      },
+      flowchart: { curve: 'basis', htmlLabels: true, padding: 12, nodeSpacing: 36, rankSpacing: 44 },
+      sequence: { mirrorActors: false, showSequenceNumbers: true, wrap: true, messageAlign: 'center' }
+    });
+    for (const el of blocks) {
+      try {
+        const { svg } = await mermaid.render('mmd-' + (++seq), sourceFor(el, p));
+        el.innerHTML = svg;
+      } catch (e) {
+        el.innerHTML = '';
+        const pre = document.createElement('pre');
+        pre.className = 'mmd-fallback';
+        pre.textContent = sourceFor(el, p);
+        el.appendChild(pre);
+      }
+    }
+  }
+
+  // theme toggle
+  try {
+    const saved = localStorage.getItem('minivr-theme');
+    if (saved === 'light' || saved === 'dark') root.setAttribute('data-theme', saved);
+  } catch (e) {}
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    let current = root.getAttribute('data-theme');
+    if (!current) current = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('minivr-theme', next); } catch (e) {}
+    render();
+  });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (!root.getAttribute('data-theme')) render();
+  });
+
+  render();
+</script>
+</body>
+</html>

@@ -29,3 +29,47 @@ GEMINI.md
 .kiro/
 .qwen/
 .opencode/
+
+# ---- minivr: build outputs ----
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CMakeUserPresets.json
+compile_commands.json
+Testing/
+*.o
+*.a
+*.so
+*.d
+
+# ---- minivr: binaries ----
+/minivrd
+/vrctl
+
+# ---- minivr: python e2e ----
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# ---- minivr: lab / debugging artifacts ----
+core
+core.*
+*.core
+*.log
+/tmp/
+before.json
+after.json
+perf.data*
+*.svg.tmp
+
+# ---- editors / OS ----
+.vscode/
+.idea/
+.clangd/
+.cache/
+*.swp
+*~
+.DS_Store
