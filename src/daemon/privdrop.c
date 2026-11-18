@@ -17,15 +17,13 @@
 #define PR_CAP_AMBIENT_CLEAR_ALL 4
 #endif
 
-static int verify(uid_t want_uid) {
-    FILE *f = fopen("/proc/self/status", "r");
-    if (!f) {
-        log_error("privdrop", "cannot read /proc/self/status", "errno=%d", errno);
-        return -1;
-    }
-    char line[256];
+int privdrop_check_status(const char *text, unsigned want_uid) {
     int ok_uid = 0, ok_eff = 0, ok_prm = 0, ok_amb = 0, ok_nnp = 0;
-    while (fgets(line, sizeof line, f)) {
+    while (*text) {
+        char line[256];
+        size_t n = strcspn(text, "\n");
+        snprintf(line, sizeof line, "%.*s", (int)(n < sizeof line - 1 ? n : sizeof line - 1), text);
+        text += n + (text[n] == '\n');
         unsigned r, e, s, fs;
         char cap[32];
         int nnp;
@@ -40,11 +38,26 @@ static int verify(uid_t want_uid) {
         else if (sscanf(line, "NoNewPrivs: %d", &nnp) == 1)
             ok_nnp = nnp == 1;
     }
+    return (ok_uid ? 0 : PRIVCHK_UID) | (ok_eff ? 0 : PRIVCHK_CAPEFF) |
+           (ok_prm ? 0 : PRIVCHK_CAPPRM) | (ok_amb ? 0 : PRIVCHK_CAPAMB) |
+           (ok_nnp ? 0 : PRIVCHK_NNP);
+}
+
+static int verify(uid_t want_uid) {
+    FILE *f = fopen("/proc/self/status", "r");
+    if (!f) {
+        log_error("privdrop", "cannot read /proc/self/status", "errno=%d", errno);
+        return -1;
+    }
+    char text[16384];
+    size_t n = fread(text, 1, sizeof text - 1, f);
     fclose(f);
-    if (!(ok_uid && ok_eff && ok_prm && ok_amb && ok_nnp)) {
-        log_error("privdrop", "self-verification failed",
-                  "uid_ok=%d capeff_ok=%d capprm_ok=%d capamb_ok=%d nnp_ok=%d", ok_uid, ok_eff,
-                  ok_prm, ok_amb, ok_nnp);
+    text[n] = 0;
+    int bad = privdrop_check_status(text, want_uid);
+    if (bad) {
+        log_error("privdrop", "self-verification failed", "uid_ok=%d capeff_ok=%d capprm_ok=%d capamb_ok=%d nnp_ok=%d",
+                  !(bad & PRIVCHK_UID), !(bad & PRIVCHK_CAPEFF), !(bad & PRIVCHK_CAPPRM),
+                  !(bad & PRIVCHK_CAPAMB), !(bad & PRIVCHK_NNP));
         return -1;
     }
     return 0;

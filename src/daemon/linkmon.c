@@ -10,13 +10,15 @@
 #include <unistd.h>
 
 #include "evloop.h"
+#include "linkmon_parse.h"
 #include "minivr/log.h"
 #include "minivr/neigh.h"
 #include "minivr/port.h"
 
 static struct evsrc src = {.fd = -1};
 
-static void apply(const char *ifname, unsigned flags) {
+static void apply(const char *ifname, unsigned flags, void *arg) {
+    (void)arg;
     for (unsigned i = 0; i < MAX_PORTS; i++) {
         struct port *p = port_get((uint8_t)i);
         if (!p || strcmp(p->ifname, ifname) != 0)
@@ -33,28 +35,6 @@ static void apply(const char *ifname, unsigned flags) {
     }
 }
 
-static void handle_msg(const struct nlmsghdr *nh) {
-    if (nh->nlmsg_type != RTM_NEWLINK && nh->nlmsg_type != RTM_DELLINK)
-        return;
-    if (nh->nlmsg_len < NLMSG_LENGTH(sizeof(struct ifinfomsg)))
-        return;
-    const struct ifinfomsg *ifi = NLMSG_DATA(nh);
-    unsigned flags = nh->nlmsg_type == RTM_DELLINK ? 0 : ifi->ifi_flags;
-    size_t alen = nh->nlmsg_len - NLMSG_LENGTH(sizeof *ifi);
-    for (const struct rtattr *a = IFLA_RTA(ifi); RTA_OK(a, alen); a = RTA_NEXT(a, alen)) {
-        if (a->rta_type != IFLA_IFNAME)
-            continue;
-        char name[IFNAMSIZ + 1];
-        size_t n = RTA_PAYLOAD(a);
-        if (n > IFNAMSIZ)
-            n = IFNAMSIZ;
-        memcpy(name, RTA_DATA(a), n);
-        name[n] = 0;
-        apply(name, flags);
-        return;
-    }
-}
-
 static void on_readable(struct evsrc *s, uint32_t ev) {
     (void)ev;
     char buf[16384];
@@ -64,10 +44,7 @@ static void on_readable(struct evsrc *s, uint32_t ev) {
             log_warn("linkmon", "netlink overrun; link state may be stale");
         return;
     }
-    size_t len = (size_t)n;
-    for (const struct nlmsghdr *nh = (const struct nlmsghdr *)buf; NLMSG_OK(nh, len);
-         nh = NLMSG_NEXT(nh, len))
-        handle_msg(nh);
+    linkmon_parse(buf, (size_t)n, apply, NULL);
 }
 
 int linkmon_init(void) {
