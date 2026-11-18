@@ -261,3 +261,30 @@ TEST(oversized_response_is_an_error_not_truncation) {
     CHECK(w.overflow); /* the server maps this to an error response (ctl_server.c) */
     fx_teardown();
 }
+
+TEST(show_commands_are_paged) {
+    fx_setup(1);
+    for (uint32_t i = 0; i < 1200; i++) {
+        char line[96];
+        snprintf(line, sizeof line, "route add 100.%u.%u.0/24 dev p3", i >> 8, i & 255);
+        CHECK(cli(line) == 0);
+    }
+    /* default page: fits one response, says where the next page starts */
+    CHECK(cli("route show") == 0);
+    CHECK(strstr(out, "\"total\":1205,\"offset\":0,"));
+    CHECK(strstr(out, "\"next_offset\":500}"));
+    CHECK(cli("route show offset 500 limit 700") == 0);
+    CHECK(strstr(out, "\"offset\":500,"));
+    CHECK(strstr(out, "\"next_offset\":1200}"));
+    CHECK(cli("route show offset 1200") == 0); /* last page: 5 routes, next_offset null */
+    CHECK(strstr(out, "\"next_offset\":null}"));
+    CHECK(cli("route show limit 0") == -1);
+    CHECK_STR_EQ(cerr.code, "bad-syntax");
+    CHECK(cli("route show offset") == -1);
+    CHECK(cli("neigh show limit 2") == 0);
+    CHECK(strstr(out, "\"total\":3,\"offset\":0,"));
+    CHECK(strstr(out, "\"next_offset\":2}"));
+    CHECK(cli("neigh show offset 2 limit 2") == 0);
+    CHECK(strstr(out, "\"next_offset\":null}"));
+    fx_teardown();
+}

@@ -272,17 +272,69 @@ static void json_route(struct jw *w, const char *key, const struct route *r) {
     jw_obj_end(w);
 }
 
+#define SHOW_DEFAULT_LIMIT 500 /* ~45 KB of JSON: always fits one 64 KiB response */
+
+struct page {
+    struct jw *w;
+    uint64_t index, offset, limit, emitted;
+    int more; /* an entry exists beyond this page */
+};
+
+/* "[offset <n>] [limit <n>]" starting at argv[2]. */
+static int parse_page(struct cmd_ctx *c, int argc, char **argv, const char *usage_line,
+                      uint64_t *offset, uint64_t *limit) {
+    *offset = 0;
+    *limit = SHOW_DEFAULT_LIMIT;
+    for (int i = 2; i < argc; i += 2) {
+        if (i + 1 >= argc)
+            return usage(c, usage_line);
+        uint64_t *dst = strcmp(argv[i], "offset") == 0  ? offset
+                        : strcmp(argv[i], "limit") == 0 ? limit
+                                                         : NULL;
+        if (!dst)
+            return usage(c, usage_line);
+        const char *e = cmd_parse_uint(argv[i + 1], dst == limit ? 1 : 0, 1000000, dst);
+        if (e)
+            return cmd_fail(c->err, e, "%s must be a number (limit >= 1)", argv[i]);
+    }
+    return 0;
+}
+
+static void page_header(struct page *pg, uint64_t total) {
+    jw_u64(pg->w, "total", total);
+    jw_u64(pg->w, "offset", pg->offset);
+}
+
+static void page_footer(struct page *pg) {
+    /* next_offset is null on the last page: vrctl follows it to print everything */
+    if (pg->more)
+        jw_u64(pg->w, "next_offset", pg->offset + pg->limit);
+    else
+        jw_null(pg->w, "next_offset");
+}
+
 static void route_show_cb(const struct route *r, void *arg) {
-    json_route(arg, NULL, r);
+    struct page *pg = arg;
+    uint64_t i = pg->index++;
+    if (i < pg->offset)
+        return;
+    if (pg->emitted >= pg->limit) {
+        pg->more = 1;
+        return;
+    }
+    pg->emitted++;
+    json_route(pg->w, NULL, r);
 }
 
 static int cmd_route_show(struct cmd_ctx *c, int argc, char **argv) {
-    (void)argv;
-    if (argc != 2)
-        return usage(c, "route show");
+    struct page pg = {.w = c->out};
+    if (parse_page(c, argc, argv, "route show [offset <n>] [limit <n>]", &pg.offset, &pg.limit))
+        return -1;
+    page_header(&pg, route_count());
     jw_arr_begin(c->out, "routes");
-    route_walk(route_show_cb, c->out);
+    route_walk(route_show_cb, &pg);
     jw_arr_end(c->out);
+    page_footer(&pg);
     return 0;
 }
 
@@ -383,14 +435,16 @@ static int row_cmp(const void *a, const void *b) {
 }
 
 static int cmd_neigh_show(struct cmd_ctx *c, int argc, char **argv) {
-    (void)argv;
-    if (argc != 2)
-        return usage(c, "neigh show");
+    struct page pg = {.w = c->out};
+    if (parse_page(c, argc, argv, "neigh show [offset <n>] [limit <n>]", &pg.offset, &pg.limit))
+        return -1;
     nrows = 0;
     neigh_walk(neigh_collect, NULL);
     qsort(rows, nrows, sizeof rows[0], row_cmp);
+    page_header(&pg, nrows);
+    pg.more = nrows > pg.offset + pg.limit;
     jw_arr_begin(c->out, "neighbours");
-    for (unsigned i = 0; i < nrows; i++) {
+    for (uint64_t i = pg.offset; i < nrows && i < pg.offset + pg.limit; i++) {
         const struct neigh *n = rows[i].n;
         char ip[16], mac[18];
         ip_str(n->ip, ip);
@@ -412,6 +466,7 @@ static int cmd_neigh_show(struct cmd_ctx *c, int argc, char **argv) {
         jw_obj_end(c->out);
     }
     jw_arr_end(c->out);
+    page_footer(&pg);
     return 0;
 }
 

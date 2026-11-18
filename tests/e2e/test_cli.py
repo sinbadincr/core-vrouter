@@ -172,3 +172,43 @@ def test_other_users_are_not_permitted(forwarder):
                         str(VRCTL_BIN), "-s", "/run/mvr-cn1/minivr.sock", "route", "show"],
                        capture_output=True, text=True)
     assert r.returncode == 3 and "not-permitted" in r.stderr, (r.returncode, r.stderr)
+
+
+def test_sc010_full_route_table_still_updates_live(lab, tmp_path):
+    """10,000 routes loaded: listing pages correctly, the table refuses an extra route, and a
+    route change still takes effect within 1 s on live traffic."""
+    conf = (ROOT / "lab" / "cn1-nobind.conf").read_text().splitlines()
+    conf.append("route add 10.0.9.0/24 dev p3 via 10.0.2.13")
+    base = 4 + 1  # connected p1/p2 (shared), connected p3, two host routes, the route above
+    conf += [f"route add 100.{i >> 8}.{i & 255}.0/24 dev p3 via 10.0.2.13"
+             for i in range(10000 - base)]
+    cfg = tmp_path / "full.conf"
+    cfg.write_text("\n".join(conf) + "\n")
+    pid = start_forwarder(str(cfg))
+    ns_exec("mvr-vm3", "ip", "addr", "add", "10.0.9.1/32", "dev", "lo")
+
+    first = vrctl("route", "show", "limit", "1")["data"]
+    assert first["total"] == 10000 and first["next_offset"] == 1
+    # page through everything: 20 pages of 500, no overlap, nothing lost
+    seen, offset = [], 0
+    while offset is not None:
+        page = vrctl("route", "show", "offset", str(offset))["data"]
+        seen += [r["prefix"] for r in page["routes"]]
+        offset = page["next_offset"]
+    assert len(seen) == 10000 and len(set(seen)) == 10000
+    # the human-readable table follows the pages by itself
+    assert len(vrctl_raw("route", "show").stdout.splitlines()) == 10001
+
+    r = vrctl("route", "add", "200.0.0.0/24", "dev", "p3")
+    assert r["ok"] is False and r["error"]["code"] == "table-full"
+    assert " 0% packet loss" in ping("mvr-vm1", "-c", "2", "-W", "2", "10.0.9.1").stdout
+
+    t0 = time.monotonic()
+    assert vrctl("route", "del", "10.0.9.0/24")["ok"]
+    assert "Destination Net Unreachable" in ping("mvr-vm1", "-c", "1", "-W", "1", "10.0.9.1").stdout
+    assert time.monotonic() - t0 < 1.0
+    t0 = time.monotonic()
+    assert vrctl("route", "add", "10.0.9.0/24", "dev", "p3", "via", "10.0.2.13")["ok"]
+    assert " 0% packet loss" in ping("mvr-vm1", "-c", "1", "-W", "1", "10.0.9.1").stdout
+    assert time.monotonic() - t0 < 1.0
+    assert forwarder_pid() == pid

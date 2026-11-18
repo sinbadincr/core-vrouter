@@ -86,8 +86,8 @@ static void handle_request(struct client *c, const uint8_t *p, size_t len) {
             jw_obj_begin(&w, NULL);
             jw_bool(&w, "ok", false);
             jw_obj_begin(&w, "error");
-            jw_str(&w, "code", "table-full");
-            jw_str(&w, "message", "response exceeds 65536 bytes");
+            jw_str(&w, "code", "bad-syntax");
+            jw_str(&w, "message", "response exceeds 65536 bytes; use offset/limit");
             jw_obj_end(&w);
             jw_obj_end(&w);
         }

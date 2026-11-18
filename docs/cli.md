@@ -38,11 +38,11 @@ Address syntax: IPv4 dotted quad; prefix `a.b.c.d/len` (host bits must be zero);
 | `icmp-ratelimit rate <1..100000> burst <1..10000>` | config, CLI | ICMP error limiter applied to every port (defaults 100 / 20) |
 | `port show` | CLI | name, ifname, mac, ip/len, mtu, admin, oper, rx/tx packets and bytes, drops |
 | `port set <name> admin up\|down` | CLI | change admin state; going down releases held packets |
-| `route show` | CLI | prefix, port, gateway, origin, in prefix order |
+| `route show [offset <n>] [limit <n>]` | CLI | prefix, port, gateway, origin, in prefix order; paged (default 500 per page) |
 | `route add <prefix> dev <port> [via <gw>]` | config, CLI | add a static route; `gw` must be inside the egress port's subnet |
 | `route del <prefix>` | CLI | delete a static route; `connected` and `host` routes are `immutable` |
 | `route lookup <ip>` | CLI | the route the longest-prefix match selects |
-| `neigh show` | CLI | ip, mac, port, kind (`static`/`learned`), state, held packets |
+| `neigh show [offset <n>] [limit <n>]` | CLI | ip, mac, port, kind (`static`/`learned`), state, held packets; paged like `route show` |
 | `neigh add <ip> lladdr <mac> dev <port>` | config, CLI | static neighbour; also installs the `/32` host route and binds the port to that VM (anti-spoofing) |
 | `neigh del <ip>` | CLI | delete a neighbour (and its host route and binding) |
 | `stats show` | CLI | per-port counters, every drop reason, event counters, mbuf gauge |
@@ -50,8 +50,14 @@ Address syntax: IPv4 dotted quad; prefix `a.b.c.d/len` (host bits must be zero);
 | `version` | CLI | protocol, version, build type, uptime |
 | `debug crash` | CLI, debug builds | deliberate NULL dereference, for the crash drill |
 
-A failed command never changes forwarder state. A response larger than 65,536 bytes (for
-example `route show` with thousands of routes) is reported as `table-full`.
+A failed command never changes forwarder state.
+
+**Paging.** A response is limited to 65,536 bytes, so `route show` and `neigh show` return at
+most `limit` entries (default 500, at least 1) starting at `offset`, plus `total`, `offset` and
+`next_offset` (`null` on the last page). In table mode `vrctl` follows `next_offset` itself and
+prints everything; with `-j` you get one page and ask for the next with `offset <next_offset>`.
+Any other response that would still exceed the limit is rejected with `bad-syntax` and the message
+"use offset/limit".
 
 ## Error codes
 
@@ -64,7 +70,7 @@ example `route show` with thousands of routes) is reported as `table-full`.
 | `unknown-port` | no port with that name |
 | `exists` | duplicate route / neighbour, or the port already has a static neighbour |
 | `not-found` | no such route / neighbour |
-| `table-full` | route table (10,000), neighbour table (1,024) or response size exceeded |
+| `table-full` | route table (10,000) or neighbour table (1,024) full |
 | `gw-not-connected` | route gateway outside the egress port's subnet |
 | `immutable` | deleting a `connected` or `host` route |
 | `config-only` | command only valid in the config file |
@@ -77,11 +83,11 @@ Success is `{"ok": true, "data": {...}}`, failure is `{"ok": false, "error": {"c
 Mutating commands return `"data": {}`.
 
 ```json
-{"ok": true, "data": {"routes": [
+{"ok": true, "data": {"total": 2, "offset": 0, "next_offset": null, "routes": [
   {"prefix": "10.0.1.0/24", "port": null, "gateway": null, "origin": "connected"},
   {"prefix": "10.0.9.0/24", "port": "p3", "gateway": "10.0.2.13", "origin": "static"}]}}
 
-{"ok": true, "data": {"neighbours": [
+{"ok": true, "data": {"total": 1, "offset": 0, "next_offset": null, "neighbours": [
   {"ip": "10.0.2.13", "mac": "02:00:00:00:01:03", "port": "p3",
    "kind": "static", "state": "REACHABLE", "held": 0}]}}
 

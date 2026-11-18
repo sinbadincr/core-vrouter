@@ -101,6 +101,8 @@ static int request(int fd, const char *cmd, char **resp, size_t *rlen) {
     return *resp ? 0 : -1;
 }
 
+static int g_continuation; /* later pages of one listing: no repeated header */
+
 static const char *sval(const struct jnode *o, const char *k, const char *dflt) {
     const struct jnode *n = json_get(o, k);
     return n && n->type == J_STR && n->str ? n->str : dflt;
@@ -118,7 +120,8 @@ static void render_route_row(const struct jnode *r) {
 
 static void render_table(const char *cmd, const struct jnode *d) {
     if (strcmp(cmd, "route show") == 0) {
-        printf("%-16s%-6s%-12s%s\n", "PREFIX", "PORT", "GATEWAY", "ORIGIN");
+        if (!g_continuation)
+            printf("%-16s%-6s%-12s%s\n", "PREFIX", "PORT", "GATEWAY", "ORIGIN");
         for (const struct jnode *r = json_get(d, "routes") ? json_get(d, "routes")->child : NULL; r;
              r = r->next)
             render_route_row(r);
@@ -136,7 +139,8 @@ static void render_table(const char *cmd, const struct jnode *d) {
                    uval(r, "rx_pkts"), uval(r, "rx_bytes"), uval(r, "tx_pkts"), uval(r, "tx_bytes"),
                    uval(r, "drops"));
     } else if (strcmp(cmd, "neigh show") == 0) {
-        printf("%-16s%-19s%-6s%-9s%-12s%s\n", "IP", "MAC", "PORT", "KIND", "STATE", "HELD");
+        if (!g_continuation)
+            printf("%-16s%-19s%-6s%-9s%-12s%s\n", "IP", "MAC", "PORT", "KIND", "STATE", "HELD");
         for (const struct jnode *r =
                  json_get(d, "neighbours") ? json_get(d, "neighbours")->child : NULL;
              r; r = r->next)
@@ -300,6 +304,24 @@ int main(int argc, char **argv) {
             return EXIT_UNREACHABLE;
         }
         rc = render(cmd, root, resp, json);
+        /* listings are paged by the server; in table mode follow next_offset to the end
+         * (with -j the caller gets one page and pages itself) */
+        int paged = !json && (strcmp(cmd, "route show") == 0 || strcmp(cmd, "neigh show") == 0);
+        while (paged && rc == 0) {
+            const struct jnode *next = json_get(json_get(root, "data"), "next_offset");
+            if (!next || next->type != J_NUM)
+                break;
+            char page_cmd[1100];
+            snprintf(page_cmd, sizeof page_cmd, "%s offset %llu", cmd, (unsigned long long)next->u);
+            json_free(root);
+            free(resp);
+            if (request(fd, page_cmd, &resp, &rlen) != 0 || !(root = json_parse(resp, rlen))) {
+                fprintf(stderr, "vrctl: no response from forwarder\n");
+                return EXIT_UNREACHABLE;
+            }
+            g_continuation = 1;
+            rc = render(cmd, root, resp, json);
+        }
     }
     json_free(root);
     free(resp);
