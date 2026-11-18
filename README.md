@@ -42,9 +42,18 @@ and the fast-path audit.
 
 ## Demo
 
-A recorded demo (asciinema) will go here: bring-up, ping, live `route del`/`route add`,
-the malformed-traffic corpus, and the crash drill. Until then, `docs/lab.md` and
-`specs/001-lab-l3-forwarder/quickstart.md` are the click-by-click version.
+`sudo scripts/demo.sh` walks through the whole thing: lab up, forwarder start, pings between VMs,
+the route/neighbour/port tables, a live `route del`/`route add` while pinging, the malformed
+traffic corpus landing in named drop reasons, and teardown. A captured run is in
+[`docs/demo.md`](docs/demo.md); `sudo asciinema rec -c scripts/demo.sh docs/demo.cast` records a
+terminal cast of it.
+
+## Benchmarks
+
+None in phase 1, on purpose: phase 1 optimises for correctness and observability. Any
+optimisation from phase 4 on needs a committed benchmark, perf evidence and an entry in
+`docs/perf.md` (constitution VI), and numbers will be labelled as VM/virtual-device results,
+not line rate.
 
 ## Documentation
 
@@ -54,6 +63,7 @@ the malformed-traffic corpus, and the crash drill. Until then, `docs/lab.md` and
 | `docs/lab.md` | topology, addressing, commands, safety guarantees |
 | `docs/cli.md` | every `vrctl` command, exit code, error code and JSON shape |
 | `docs/drop-reasons.md` | every named drop reason, its trigger and its test |
+| `docs/demo.md` | captured output of the scripted demo |
 | `docs/traceability.md` | each requirement and success criterion mapped to a test |
 | `incidents/` | post-mortems, starting with the forced-crash drill |
 | `specs/001-lab-l3-forwarder/` | spec, plan, research decisions, data model, contracts, tasks |
@@ -67,5 +77,5 @@ and control socket, `src/daemon` the `minivrd` main/loop/privileges/crash/link m
 
 ## Status
 
-Phase 1 (single-node lab and L3 forwarder). Not claimed: performance (no benchmarks yet),
+Phase 1 (single-node lab and L3 forwarder). Not claimed: performance (see Benchmarks),
 multi-core, tunnelling, IPv6, VLANs, ARP/neighbour aging. See the spec's assumptions.

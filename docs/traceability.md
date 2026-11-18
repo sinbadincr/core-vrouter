@@ -46,7 +46,7 @@ Every functional requirement (FR) and success criterion (SC) of
 
 | SC | Criterion | Covered by |
 |---|---|---|
-| SC-001 | clone to first ping in under 15 minutes | `README.md` quickstart; the commands are the ones `make e2e` exercises (not timed automatically) |
+| SC-001 | clone to first ping in under 10 minutes | `README.md` quickstart; the commands are the ones `make e2e` exercises (not timed automatically) |
 | SC-002 | bring-up < 10 s, teardown < 5 s, host unchanged | `test_lab.py::test_timing_budget`, `test_host_state_unchanged_*` |
 | SC-003 | 1,000 pings between every VM pair, 0% loss | `test_forwarding.py::test_v4_*` |
 | SC-004 | 1 GB TCP transfer byte-identical | `test_forwarding.py::test_v8_*` |
