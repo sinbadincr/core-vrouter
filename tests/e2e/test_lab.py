@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from conftest import host_snapshot, lab_sh, ns_exec, sh
+from conftest import BUILD, host_snapshot, lab_sh, ns_exec, sh
 
 VMS = [
     ("mvr-vm1", "02:00:00:00:01:01", "10.0.1.11/24", "10.0.1.1", "p1", "02:00:00:00:00:01"),
@@ -126,3 +126,22 @@ def test_down_removes_every_lab_object():
     assert "mvr-" not in sh("ip", "-br", "link").stdout
     from pathlib import Path
     assert not Path("/run/mvr-cn1").exists()
+
+
+def test_forwarder_fails_fast_when_the_lab_does_not_exist(tmp_path):
+    """Started before the lab exists (edge case): clear file:line error, non-zero exit, no socket."""
+    import subprocess
+    from conftest import ROOT
+    lab_sh("down", check=False)
+    cfg = tmp_path / "nolab.conf"
+    cfg.write_text("# no such interface\nport add p1 ifname mvr-nolab0 ip 10.0.1.1/24\n")
+    sock = tmp_path / "x.sock"
+    r = subprocess.run([str(ROOT / "build" / BUILD / "minivrd"), "--config", str(cfg),
+                        "--sock", str(sock)], capture_output=True, text=True, timeout=10)
+    assert r.returncode != 0
+    assert f"{cfg}:2: not-found: cannot open interface mvr-nolab0" in r.stderr, r.stderr
+    assert not sock.exists()
+    cfg.write_text("port add p1 ifname eth0\n")  # a syntax error is reported with its line too
+    r = subprocess.run([str(ROOT / "build" / BUILD / "minivrd"), "--config", str(cfg),
+                        "--sock", str(sock)], capture_output=True, text=True, timeout=10)
+    assert r.returncode != 0 and f"{cfg}:1: bad-syntax" in r.stderr, r.stderr
