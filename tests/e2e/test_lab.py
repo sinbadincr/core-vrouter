@@ -89,15 +89,27 @@ def test_timing_budget():
     assert down < 5, f"teardown took {down:.1f}s"
 
 
+def ens33_state():
+    """ens33 addresses without DHCP lease timers, which count down by themselves."""
+    r = sh("ip", "-j", "addr", "show", "ens33", check=False)
+    if r.returncode != 0:
+        return None
+    links = json.loads(r.stdout)
+    for link in links:
+        for a in link.get("addr_info", []):
+            a.pop("valid_life_time", None)
+            a.pop("preferred_life_time", None)
+    return links
+
+
 def test_host_state_unchanged_and_ens33_untouched():
     lab_sh("down", check=False)
     before = host_snapshot()
-    ens = sh("ip", "-j", "addr", "show", "ens33", check=False)
+    ens = ens33_state()
     lab_sh("up")
     lab_sh("down")
     assert host_snapshot() == before
-    if ens.returncode == 0:
-        assert sh("ip", "-j", "addr", "show", "ens33").stdout == ens.stdout
+    assert ens33_state() == ens
 
 
 def test_scripts_never_reference_the_host_nic():
