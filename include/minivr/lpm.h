@@ -5,15 +5,19 @@
 #define LPM_MAX_RULES 10000
 #define LPM_MAX_NODES (LPM_MAX_RULES * 32 + 2)
 
+/* 16 bytes, so a 64-byte cache line holds 4 nodes and the array is cache-line aligned below: a
+ * lookup follows at most 32 dependent child links, so the layout is about keeping each hop to at
+ * most one line (siblings/children allocated close together are likely to share one). */
 struct lpm_node {
     uint32_t child[2]; /* 0 = none */
     uint32_t value;
     uint8_t has_value;
 };
+_Static_assert(sizeof(struct lpm_node) == 16, "4 trie nodes per cache line");
 
 /* Binary trie over a pre-allocated node pool (no allocation after init). */
 struct lpm {
-    struct lpm_node nodes[LPM_MAX_NODES];
+    _Alignas(64) struct lpm_node nodes[LPM_MAX_NODES];
     uint32_t free_head; /* free list through child[0] */
     uint32_t next_unused;
     uint32_t rules;

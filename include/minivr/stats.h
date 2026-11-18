@@ -47,6 +47,9 @@ struct stats {
     uint64_t icmp_ratelimited, neighbour_table_full, arp_replies_sent, icmp_sent;
 };
 
+/* One global instance owned by the forwarding thread. In phase 1 a single writer means plain
+ * increments and no padding are needed; the per-port blocks are separate 40-byte structs so phase 4
+ * can turn them into per-core copies, padded to cache lines, summed on read. */
 extern struct stats g_stats;
 
 const char *stats_reason_name(enum drop_reason r);

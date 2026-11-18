@@ -5,6 +5,10 @@
 #include "minivr/neigh.h"
 
 static struct lpm table;
+/* Route entries live in a flat array indexed by the trie's value, so a lookup is the trie walk
+ * (see lpm.h) plus exactly one entry read. Entries are ~28 bytes and unpadded: nothing writes
+ * them on the packet path, so there is no false sharing; mutation happens between bursts on the
+ * same thread. Phase 4 will make updates RCU-style; the layout can then be reconsidered. */
 static struct route routes[LPM_MAX_RULES];
 static uint32_t free_head; /* index+1 of the first free slot, 0 = none */
 static uint32_t used_count;

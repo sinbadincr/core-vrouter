@@ -15,6 +15,12 @@
 
 enum { SLOT_EMPTY, SLOT_USED, SLOT_TOMB };
 
+/* Neighbour table: open addressing over 2,048 slots with linear probing, so a lookup normally
+ * touches one or two adjacent slots (sequential, prefetch-friendly) and the load factor stays at
+ * or below 50% (capacity 1,024). A slot is ~72 bytes, deliberately not padded to a cache line:
+ * phase 1 has one thread, so there is no false sharing to avoid. When forwarding moves to several
+ * cores (phase 4) the table is read-mostly shared state and gets an RCU/epoch swap rather than
+ * per-slot padding; revisit the layout then, with a measurement (docs/perf.md). */
 static struct neigh tab[NEIGH_SLOTS];
 static unsigned used, tombs;
 static struct {
