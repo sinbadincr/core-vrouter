@@ -1,0 +1,40 @@
+#!/bin/sh
+# First-boot script for one KVM lab guest (contracts/guest-config.md). Rendered by launch.py.
+# CirrOS 0.6.3 ignores network_data.json and starts dhcpcd on every NIC, so all addressing is
+# done here. Prints MVR-READY / MVR-FAILED to the console, which bring-up polls.
+fail() {
+    echo "MVR-FAILED @NAME@ step=$1 ${2:-}" >/dev/console
+    exit 1
+}
+
+# 1. no DHCP, no IPv6 (the forwarder is IPv4 only)
+for p in $(pidof dhcpcd); do kill "$p"; done
+for i in all default eth0 eth1; do
+    sysctl -qw net.ipv6.conf.$i.disable_ipv6=1 || fail 1
+done
+
+# 2. data NIC: address and default route via the forwarder's gateway address
+ip addr flush dev eth0 || fail 2
+ip link set eth0 up || fail 2
+ip addr add @DATA_ADDR@ dev eth0 || fail 2
+ip route replace default via @GW@ dev eth0 || fail 2
+
+# 3. management NIC: address only (FR-014a: the management path carries no data traffic)
+ip addr flush dev eth1 || fail 3
+ip link set eth1 up || fail 3
+ip addr add @MGMT_ADDR@ dev eth1 || fail 3
+# keep the connected route 10.99.0.0/24 that the line above created; only a default may not exist
+ip route del default dev eth1 2>/dev/null
+
+# 4. key-only SSH: lock the passwords, restart dropbear without password logins
+passwd -l cirros >/dev/null 2>&1 || fail 4 passwd-cirros
+# root is already locked in CirrOS; busybox passwd then exits non-zero, which is the state we want
+passwd -l root >/dev/null 2>&1
+# stop the stock dropbear and wait until port 22 is free (pkill is not reliable here)
+for p in $(pidof dropbear); do kill "$p"; done
+n=0
+while [ -n "$(pidof dropbear)" ] && [ $n -lt 20 ]; do sleep 0.25; n=$((n + 1)); done
+out=$(dropbear -s -R 2>&1) || fail 4 "dropbear: $out"
+
+# 5. ready
+echo "MVR-READY @NAME@ @DATA_ADDR@ @MGMT_ADDR@" >/dev/console
