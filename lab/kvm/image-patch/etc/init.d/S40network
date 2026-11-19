@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# minivr lab recipe (research R15): the stock script starts a DHCP client that blocks boot for
+# 180 s, because the lab has no DHCP server. Addresses come from the config drive user_data.
+#
+case "$1" in
+  start)
+	printf "Starting network: "
+	/sbin/ifup lo
+	echo "OK (static, set by user_data)"
+	;;
+  stop)
+	printf "Stopping network: "
+	/sbin/ifdown lo
+	[ $? = 0 ] && echo "OK" || echo "FAIL"
+	;;
+  restart|reload)
+	"$0" stop
+	"$0" start
+	;;
+  *)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?

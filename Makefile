@@ -1,6 +1,6 @@
 # Thin wrapper over CMake and the lab scripts.
 PRESET ?= debug
-.PHONY: build test test-asan check lab lab-run lab-clean e2e clean
+.PHONY: build test test-asan check lab lab-kvm lab-run lab-clean e2e e2e-kvm clean
 
 build:
 	cmake --preset $(PRESET) && cmake --build --preset $(PRESET) -j
@@ -18,6 +18,9 @@ check:
 lab:
 	lab/lab.sh up
 
+lab-kvm:
+	lab/lab.sh up --kvm
+
 lab-run:
 	lab/lab.sh run
 
@@ -26,6 +29,9 @@ lab-clean:
 
 e2e:
 	tests/e2e/run.sh
+
+e2e-kvm:
+	tests/e2e/run.sh --kvm
 
 clean:
 	rm -rf build

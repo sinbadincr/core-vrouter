@@ -73,3 +73,10 @@ perf.data*
 *.swp
 *~
 .DS_Store
+
+# ---- minivr: KVM lab guest images and disks (never committed) ----
+*.qcow2
+*.img
+*.iso
+# the image recipe has a directory called init.d, which the *.d rule above would hide
+!lab/kvm/image-patch/etc/init.d/

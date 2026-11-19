@@ -80,7 +80,7 @@ and control socket, `src/daemon` the `minivrd` main/loop/privileges/crash/link m
 | Phase | Scope | Status |
 |---|---|---|
 | 1. Lab + L3 forwarder | Namespace lab (`mvr-cn1` + 3 VMs); AF_PACKET/epoll forwarder with proxy ARP, anycast gateway, LPM trie, neighbour FSM, ICMP rate limit, anti-spoofing; `vrctl` CLI; privilege drop; crash dumps and post-mortem | **Done** |
-| 1.5. KVM lab mode | Optional lab mode replacing namespace VMs with real KVM guests (CirrOS, virtio-net) attached to `minivrd` through TAP ports, as nova/libvirt attach VMs to a vRouter; no forwarder changes | Planned |
+| 1.5. KVM lab mode | Optional lab mode replacing namespace VMs with real KVM guests (CirrOS, virtio-net) attached to `minivrd` through TAP ports, as nova/libvirt attach VMs to a vRouter; no forwarder changes; see [docs/kvm.md](docs/kvm.md) | **Done** |
 | 2. VRFs + overlay tunnels | Two compute nodes over an emulated underlay; tenants with overlapping addresses; MPLSoUDP (RFC 7510) and VXLAN (RFC 7348); interop with the Linux kernel VXLAN | Spec draft |
 | 3. Agent + controller | Controller holding network state; per-node agent programming `minivrd` over a documented protocol, replacing static remote routes | Planned |
 | 4. Multi-core + DPDK + perf | Worker threads with RCU-updated tables, DIR-24-8 LPM; optional DPDK backend on virtual devices and vhost-user for KVM guests; benchmarks, perf and flame graphs in `docs/perf.md` | Planned |
