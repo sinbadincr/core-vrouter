@@ -57,3 +57,34 @@ Every functional requirement (FR) and success criterion (SC) of
 | SC-009 | symbolized backtrace from core + debug binary | `test_crash.py`, `incidents/0001-forced-crash-drill.md` |
 | SC-010 | 10,000-route lookups agree with a linear scan; changes still take effect within 1 s | `test_lpm.c::differential_against_linear_scan`, `test_cli.py::test_sc010_full_route_table_still_updates_live` |
 | SC-011 | ICMP-error flood bounded, other ports unaffected | `test_robustness.py::test_v14_*` |
+
+## Phase 1.5: KVM lab mode (`specs/002-kvm-lab-mode/spec.md`)
+
+Unit tests: `tests/lab/test_kvm_launch.py` (no root, no KVM; `make check`, gate `lab-unit`).
+End-to-end: `tests/e2e_kvm/` (`sudo make e2e-kvm`).
+
+| Requirement | Covered by |
+|---|---|
+| FR-001, FR-009 (explicit mode, mutual exclusion) | `test_kvm_lab.py::test_kvm_up_refused_while_namespace_lab_is_up`, `test_k3_*` |
+| FR-002 (same topology, TAP ports) | `test_kvm_lab.py::test_k1_*`, `test_kvm_launch.py::GuestTable` |
+| FR-003 (KVM required, no fallback) | `test_kvm_lab.py::test_k15_*`, `test_unusable_kvm_device_*`, `test_kvm_launch.py::test_kvm_only_never_tcg` |
+| FR-004 (pinned, verified image; amendment A1 layer) | `test_kvm_lab.py::test_corrupted_image_*`, `test_k17_*` (tampered layer rebuilt, golden untouched), `test_kvm_image.py` (recipe/logical-hash pins, reproducible build, cpio, GPT, clusters, alignment), `lab/kvm/image.lock` |
+| FR-005 (non-interactive first boot, timeout) | `test_kvm_launch.py::FirstBoot`, `test_kvm_lab.py::test_not_ready_*` |
+| FR-006 (throw-away disks) | `test_kvm_lab.py::test_k14_*` |
+| FR-007 (idempotent, only `mvr-*`) | `test_kvm_lab.py::test_k2_*`, `test_k14_*`; host snapshot guard in `conftest.py` |
+| FR-008 (no offloads) | `test_kvm_launch.py::test_nics_addresses_macs_offloads`, `test_kvm_forwarding.py::test_k8_*` |
+| FR-009a (memory) | `test_kvm_launch.py::test_memory_and_cpu_limits`, `test_kvm_lab.py::test_k16_*` |
+| FR-010 (same behaviour, same binary and config) | `test_kvm_forwarding.py::test_k4`…`test_k10` |
+| FR-011 (unprivileged QEMU, sandbox) | `test_kvm_launch.py::test_sandbox_and_hygiene` |
+| FR-012, FR-013 (status, console log) | `test_kvm_mgmt.py::test_status_lists_guests`, `test_console_logs_*` |
+| FR-014, FR-014a (management path, no data on it) | `test_kvm_mgmt.py::test_k11_*`, `test_guest_invariants` |
+| FR-014b (key-only SSH) | `test_kvm_mgmt.py::test_k12_*`, `test_kvm_launch.py::test_user_data` |
+| FR-015, FR-016 (suite skips without KVM; default suite unchanged) | `tests/e2e/run.sh --kvm`, `test_kvm_lab.py::test_unusable_kvm_device_*` |
+| FR-017 (docs) | `docs/kvm.md`, `docs/lab.md`, `README.md` |
+| SC-001, SC-002 | `test_k1_*`, `test_k14_*` |
+| SC-003, SC-004 | `test_k5_*`, `test_k8_*` |
+| SC-005 | `test_k10_*` (identity line logged by `lab.sh run`) |
+| SC-006 | `tests/e2e/run.sh --kvm` budget (`MINIVR_E2E_BUDGET_S=300`) |
+| SC-007 | `test_k15_*` |
+| SC-008 | `test_k16_*` |
+| SC-010 | `test_k11_*` |
