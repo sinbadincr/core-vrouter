@@ -27,6 +27,14 @@ gate gcc-build   sh -c 'cmake --preset debug && cmake --build --preset debug -j'
 gate clang-build sh -c 'cmake --preset clang-debug && cmake --build --preset clang-debug -j'
 gate ctest-debug sh -c 'ctest --preset debug'
 gate ctest-asan  sh -c 'cmake --preset asan && cmake --build --preset asan -j && ctest --preset asan'
+# lab-unit: unit tests of lab/kvm/launch.py (no root, no KVM). Must run at least one test.
+lab_unit() {
+    local out
+    out=$(python3 -m unittest discover -s tests/lab -p 'test_*.py' -v 2>&1) || { echo "$out"; return 1; }
+    echo "$out"
+    echo "$out" | grep -Eq '^Ran [1-9][0-9]* tests?' || { echo "no lab unit tests found" >&2; return 1; }
+}
+gate lab-unit lab_unit
 if [ -x scripts/check-fastpath.sh ]; then
     gate fastpath scripts/check-fastpath.sh
 fi
