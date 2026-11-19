@@ -1,0 +1,15 @@
+# Pinned guest image for the optional KVM lab mode (research R2). Shell-sourceable.
+# Verified against https://download.cirros-cloud.net/0.6.3/SHA256SUMS on 2026-11-19.
+CIRROS_VERSION=0.6.3
+CIRROS_FILE=cirros-0.6.3-x86_64-disk.img
+CIRROS_URL=https://download.cirros-cloud.net/0.6.3/cirros-0.6.3-x86_64-disk.img
+CIRROS_SHA256=7d6355852aeb6dbcd191bcda7cd74f1536cfe5cbf8a10495a7283a8396e4b75b
+CIRROS_LICENSE=GPL-2.0
+
+# Layer over the golden image (research R15). The golden file above is never written.
+# Bump MVR_REV whenever lab/kvm/image-patch/ changes, then refresh the two hashes:
+#   lab/kvm/image.py patch-hash --patch-dir lab/kvm/image-patch
+#   lab/kvm/image.py build --golden build/cache/images/$CIRROS_FILE --patch-dir lab/kvm/image-patch --out /tmp/l.qcow2
+MVR_REV=1
+MVR_PATCH_SHA256=a6c1dfa4118f79974f0dc9ee8bb03401daa7e54fad4d20dd09cc1ce5ff51dc9e
+MVR_LAYER_LOGICAL_SHA256=ccb370624ecf4180ff368ac8a98e7044c4886878f5db1b0d615f8375a5293452
