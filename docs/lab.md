@@ -60,3 +60,9 @@ sudo ip netns exec mvr-vm1 tcpdump -ni eth0 arp
 sudo ip netns exec mvr-cn1 ip -d link show p1
 tail -f build/lab/minivrd.log
 ```
+
+## KVM mode
+
+`sudo make lab-kvm` replaces the three VM namespaces with KVM guests on TAP ports `p1`–`p3`; the
+forwarder, its config and `vrctl` are the same. Prerequisites, wiring, the management network and
+troubleshooting are in [kvm.md](kvm.md). `sudo make lab-clean` removes either mode.
