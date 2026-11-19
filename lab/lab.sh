@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # minivr lab: one compute-node namespace (mvr-cn1) + three VM namespaces over veth.
 # Only objects named mvr-* are created or removed; the host NIC and root routes are never touched.
-# Usage: lab.sh up | down | run [--config FILE] | status | snapshot
+# Usage: lab.sh up [--kvm] | down | run [--config FILE] | status | snapshot | ssh VM [CMD] | console VM [-f]
 set -euo pipefail
 
 export PATH="$PATH:/usr/sbin:/sbin"
@@ -25,6 +25,13 @@ die() { echo "lab.sh: $*" >&2; exit 1; }
 need_root() { [ "$(id -u)" -eq 0 ] || die "must run as root (sudo)"; }
 ns_exists() { ip netns list | awk '{print $1}' | grep -qx "$1"; }
 nsx() { local ns=$1; shift; ip netns exec "$ns" "$@"; }
+# lab mode, derived from the namespaces (data-model.md): kvm | netns | none
+lab_mode() {
+  if ns_exists mvr-mgmt; then echo kvm; elif ns_exists mvr-vm1; then echo netns; else echo none; fi
+}
+
+# shellcheck source=lab/kvm/kvm.sh
+. "$ROOT/lab/kvm/kvm.sh"
 
 # Refuse to continue if a root-namespace link with a lab name is not one of ours (a veth).
 check_collisions() {
@@ -58,6 +65,7 @@ PY
 
 lab_up() {
   need_root
+  [ "$(lab_mode)" != kvm ] || die "KVM lab is up; run 'sudo make lab-clean' first"
   check_collisions
   local ns
   for ns in $CN $(for v in "${VMS[@]}"; do echo "${v%% *}"; done); do
@@ -95,6 +103,45 @@ lab_up() {
   echo "lab up: $CN + mvr-vm1..3"
 }
 
+# `up --kvm`: contracts/lab-kvm.md, checks in contract order.
+lab_up_kvm() {
+  local rc=0 vm avail todo=() state
+  "$ROOT/scripts/check-prereqs.sh" --kvm >&2 || rc=$?
+  [ "$rc" -eq 0 ] || exit "$rc"
+  if [ "$(id -u)" -ne 0 ] || [ -z "${SUDO_UID:-}" ] || [ "$SUDO_UID" = 0 ]; then
+    echo "lab.sh: run via sudo from your own user; QEMU never runs as root" >&2
+    exit 2
+  fi
+  [ "$(lab_mode)" != netns ] || die "namespace lab is up; run 'sudo make lab-clean' first"
+  avail=$(awk '/^MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo)
+  # guests already running hold their memory; only demand it when nothing is up yet
+  if [ -z "$(for vm in "${KVM_GUESTS[@]}"; do kvm_pid "$vm"; done)" ] && [ "$avail" -lt 768 ]; then
+    die "need 768 MB available for 3 guests, have $avail MB"
+  fi
+  check_collisions
+  kvm_image_fetch
+  kvm_image_verify
+  kvm_image_layer
+  kvm_net_up
+  kvm_keys
+  for vm in "${KVM_GUESTS[@]}"; do
+    state=$(kvm_guest_state "$vm")
+    case "$state" in
+      ready|booting) ;;
+      *) kvm_stop_guest "$vm"; kvm_seed "$vm"; kvm_boot "$vm"; todo+=("$vm") ;;
+    esac
+  done
+  # guests that were still booting from an earlier run are waited for too
+  for vm in "${KVM_GUESTS[@]}"; do
+    [ "$(kvm_guest_state "$vm")" = booting ] && todo+=("$vm")
+  done
+  if [ ${#todo[@]} -gt 0 ]; then
+    mapfile -t todo < <(printf '%s\n' "${todo[@]}" | sort -u)
+    kvm_wait_all "${todo[@]}" || exit 1
+  fi
+  echo "lab up (kvm): $CN + vm1..3, mgmt $KVM_MGMT_NS"
+}
+
 stop_forwarder() {
   [ -f "$PIDFILE" ] || return 0
   local pid
@@ -114,6 +161,7 @@ stop_forwarder() {
 lab_down() {
   need_root
   stop_forwarder
+  kvm_stop
   local ns link
   for ns in $(ip netns list | awk '{print $1}' | grep '^mvr-' || true); do
     ip netns del "$ns" || true
@@ -140,6 +188,7 @@ lab_run() {
   ns_exists $CN || die "lab is not up (run: lab.sh up)"
   stop_forwarder
   mkdir -p "$LAB_OUT"
+  echo "identity minivrd=$(sha256sum "$bin" | awk '{print $1}') config=$(sha256sum "$config" | awk '{print $1}') mode=$(lab_mode)" >>"$LOGFILE"
   rm -rf "$RUN_DIR"
   install -d -m 0700 -o root -g root "$RUN_DIR"
   # shellcheck disable=SC2086
@@ -169,6 +218,37 @@ lab_status() {
   done
   if [ -f "$PIDFILE" ] && [ -d "/proc/$(cat "$PIDFILE")" ]; then pid=$(cat "$PIDFILE"); fi
   echo "forwarder pid: $pid"
+  if [ "$(lab_mode)" = kvm ]; then
+    echo "== guests (mode kvm)"
+    printf '%-5s %-8s %-6s %-5s %-18s %-13s %-12s %s\n' NAME STATE PID PORT MAC DATA MGMT CONSOLE
+    local vm
+    for vm in "${KVM_GUESTS[@]}"; do
+      printf '%-5s %-8s %-6s %-5s %-18s %-13s %-12s %s\n' "$vm" "$(kvm_guest_state "$vm")" \
+        "$(kvm_pid "$vm" | grep . || echo -)" "${KVM_PORT[$vm]}" "${KVM_DATA_MAC[$vm]}" \
+        "${KVM_DATA_ADDR[$vm]}" "${KVM_MGMT_IP[$vm]}" "build/lab/kvm/logs/$vm.console.log"
+    done
+  fi
+}
+
+kvm_vm_arg() { # validate a guest name
+  case "${1:-}" in vm1|vm2|vm3) ;; *) die "usage: $0 ssh|console vm1|vm2|vm3 ..." ;; esac
+}
+
+lab_ssh() {
+  need_root
+  kvm_vm_arg "${1:-}"
+  [ "$(lab_mode)" = kvm ] || die "KVM lab is not up (run: sudo make lab-kvm)"
+  local vm=$1; shift
+  kvm_ssh "$vm" "$@"
+}
+
+lab_console() {
+  kvm_vm_arg "${1:-}"
+  local log="$ROOT/build/lab/kvm/logs/$1.console.log"
+  [ -f "$log" ] || die "no console log yet: build/lab/kvm/logs/$1.console.log"
+  if [ "${2:-}" = "-f" ]; then exec tail -n 40 -f "$log"; fi
+  echo "build/lab/kvm/logs/$1.console.log"
+  tail -n 40 "$log"
 }
 
 # Host network state in the root namespace, normalised (sorted, volatile fields removed).
@@ -184,10 +264,17 @@ lab_snapshot() {
 }
 
 case "${1:-}" in
-  up) lab_up ;;
+  up)
+    case "${2:-}" in
+      "") lab_up ;;
+      --kvm) lab_up_kvm ;;
+      *) echo "usage: $0 up [--kvm]" >&2; exit 2 ;;
+    esac ;;
   down) lab_down ;;
   run) shift; lab_run "$@" ;;
   status) lab_status ;;
   snapshot) lab_snapshot ;;
-  *) echo "usage: $0 up | down | run [--config FILE] | status | snapshot" >&2; exit 2 ;;
+  ssh) shift; lab_ssh "$@" ;;
+  console) shift; lab_console "$@" ;;
+  *) echo "usage: $0 up [--kvm] | down | run [--config FILE] | status | snapshot | ssh VM [CMD...] | console VM [-f]" >&2; exit 2 ;;
 esac
