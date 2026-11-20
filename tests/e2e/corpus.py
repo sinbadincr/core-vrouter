@@ -1,5 +1,6 @@
 """Malformed-traffic corpus (US4, quickstart V13, SC-006).
 
+    sudo lab/lab.sh up --harness   # once, then:
     sudo .venv/bin/python tests/e2e/corpus.py --ns mvr-vm1 [--count N]
 
 Sends N copies of every malformed class from vm1 towards the forwarder and prints the expected

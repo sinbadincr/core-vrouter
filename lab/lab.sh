@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# minivr lab: one compute-node namespace (mvr-cn1) + three VM namespaces over veth.
+# minivr lab: one compute-node namespace (mvr-cn1) + three KVM guests on TAP ports (default),
+# or, as the test harness behind `make e2e`, three VM namespaces over veth (up --harness).
 # Only objects named mvr-* are created or removed; the host NIC and root routes are never touched.
-# Usage: lab.sh up [--kvm] | down | run [--config FILE] | status | snapshot | ssh VM [CMD] | console VM [-f]
+# Usage: lab.sh up [--harness] | down | run [--config FILE] | status | snapshot | ssh VM [CMD] | console VM [-f]
 set -euo pipefail
 
 export PATH="$PATH:/usr/sbin:/sbin"
@@ -25,9 +26,9 @@ die() { echo "lab.sh: $*" >&2; exit 1; }
 need_root() { [ "$(id -u)" -eq 0 ] || die "must run as root (sudo)"; }
 ns_exists() { ip netns list | awk '{print $1}' | grep -qx "$1"; }
 nsx() { local ns=$1; shift; ip netns exec "$ns" "$@"; }
-# lab mode, derived from the namespaces (data-model.md): kvm | netns | none
+# lab kind, derived from the namespaces (data-model.md): kvm | harness | none
 lab_mode() {
-  if ns_exists mvr-mgmt; then echo kvm; elif ns_exists mvr-vm1; then echo netns; else echo none; fi
+  if ns_exists mvr-mgmt; then echo kvm; elif ns_exists mvr-vm1; then echo harness; else echo none; fi
 }
 
 # shellcheck source=lab/kvm/kvm.sh
@@ -63,7 +64,7 @@ for cmd in (0x17, 0x19, 0x1f, 0x24, 0x2c):
 PY
 }
 
-lab_up() {
+lab_up_harness() {
   need_root
   [ "$(lab_mode)" != kvm ] || die "KVM lab is up; run 'sudo make lab-clean' first"
   check_collisions
@@ -100,10 +101,10 @@ lab_up() {
     nsx $CN sysctl -qw "net.ipv6.conf.$port.disable_ipv6=1" || echo "warning: cannot disable IPv6 on $CN/$port" >&2
     nsx $CN ip link set "$port" up
   done
-  echo "lab up: $CN + mvr-vm1..3"
+  echo "lab up (harness): $CN + mvr-vm1..3"
 }
 
-# `up --kvm`: contracts/lab-kvm.md, checks in contract order.
+# `up`: contracts/lab-kvm.md, specs/004-kvm-default-lab/contracts/lab.md, checks in contract order.
 lab_up_kvm() {
   local rc=0 vm avail todo=() state
   "$ROOT/scripts/check-prereqs.sh" --kvm >&2 || rc=$?
@@ -112,7 +113,7 @@ lab_up_kvm() {
     echo "lab.sh: run via sudo from your own user; QEMU never runs as root" >&2
     exit 2
   fi
-  [ "$(lab_mode)" != netns ] || die "namespace lab is up; run 'sudo make lab-clean' first"
+  [ "$(lab_mode)" != harness ] || die "namespace test harness is up; run 'sudo make lab-clean' first"
   avail=$(awk '/^MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo)
   # guests already running hold their memory; only demand it when nothing is up yet
   if [ -z "$(for vm in "${KVM_GUESTS[@]}"; do kvm_pid "$vm"; done)" ] && [ "$avail" -lt 768 ]; then
@@ -185,7 +186,7 @@ lab_run() {
   [ -f "$config" ] || die "config not found: $config"
   local bin="$ROOT/build/$BUILD/minivrd" ctl="$ROOT/build/$BUILD/vrctl"
   [ -x "$bin" ] && [ -x "$ctl" ] || die "build first: cmake --preset $BUILD && cmake --build --preset $BUILD"
-  ns_exists $CN || die "lab is not up (run: lab.sh up)"
+  ns_exists $CN || die "lab is not up (run: sudo make lab)"
   stop_forwarder
   mkdir -p "$LAB_OUT"
   echo "identity minivrd=$(sha256sum "$bin" | awk '{print $1}') config=$(sha256sum "$config" | awk '{print $1}') mode=$(lab_mode)" >>"$LOGFILE"
@@ -211,6 +212,7 @@ lab_run() {
 
 lab_status() {
   local ns pid=none
+  echo "lab: $(lab_mode)"
   for ns in $(ip netns list | awk '{print $1}' | grep '^mvr-' || true); do
     echo "== $ns"
     nsx "$ns" ip -brief link show | grep -v '^lo ' || true
@@ -237,7 +239,7 @@ kvm_vm_arg() { # validate a guest name
 lab_ssh() {
   need_root
   kvm_vm_arg "${1:-}"
-  [ "$(lab_mode)" = kvm ] || die "KVM lab is not up (run: sudo make lab-kvm)"
+  [ "$(lab_mode)" = kvm ] || die "KVM lab is not up (run: sudo make lab)"
   local vm=$1; shift
   kvm_ssh "$vm" "$@"
 }
@@ -266,9 +268,9 @@ lab_snapshot() {
 case "${1:-}" in
   up)
     case "${2:-}" in
-      "") lab_up ;;
-      --kvm) lab_up_kvm ;;
-      *) echo "usage: $0 up [--kvm]" >&2; exit 2 ;;
+      "") lab_up_kvm ;;
+      --harness) lab_up_harness ;;
+      *) echo "usage: $0 up [--harness]" >&2; exit 2 ;;
     esac ;;
   down) lab_down ;;
   run) shift; lab_run "$@" ;;
@@ -276,5 +278,5 @@ case "${1:-}" in
   snapshot) lab_snapshot ;;
   ssh) shift; lab_ssh "$@" ;;
   console) shift; lab_console "$@" ;;
-  *) echo "usage: $0 up [--kvm] | down | run [--config FILE] | status | snapshot | ssh VM [CMD...] | console VM [-f]" >&2; exit 2 ;;
+  *) echo "usage: $0 up [--harness] | down | run [--config FILE] | status | snapshot | ssh VM [CMD...] | console VM [-f]" >&2; exit 2 ;;
 esac

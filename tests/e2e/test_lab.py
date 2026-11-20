@@ -22,6 +22,7 @@ def sysctl(ns, path):
 
 
 def test_topology_matches_contract(lab):
+    assert lab_sh("status").stdout.splitlines()[0] == "lab: harness"
     names = sh("ip", "netns", "list").stdout
     for ns in ("mvr-cn1", "mvr-vm1", "mvr-vm2", "mvr-vm3"):
         assert ns in names
@@ -50,8 +51,8 @@ def test_topology_matches_contract(lab):
 
 def test_up_is_idempotent(lab):
     before = {ns: ns_exec(ns, "ip", "-j", "addr").stdout for ns, *_ in VMS}
-    lab_sh("up")
-    lab_sh("up")
+    lab_sh("up", "--harness")
+    lab_sh("up", "--harness")
     after = {ns: ns_exec(ns, "ip", "-j", "addr").stdout for ns, *_ in VMS}
     assert before == after
 
@@ -72,7 +73,7 @@ def test_up_recovers_from_partial_state():
     lab_sh("down", check=False)
     sh("ip", "netns", "add", "mvr-vm2")
     sh("ip", "link", "add", "mvr-vm2-e0", "type", "veth", "peer", "name", "mvr-p2")
-    lab_sh("up")
+    lab_sh("up", "--harness")
     assert ip_json("mvr-vm2", "addr", "show", "dev", "eth0")[0]["address"] == "02:00:00:00:01:02"
     lab_sh("down")
 
@@ -80,7 +81,7 @@ def test_up_recovers_from_partial_state():
 def test_timing_budget():
     lab_sh("down", check=False)
     t0 = time.monotonic()
-    lab_sh("up")
+    lab_sh("up", "--harness")
     up = time.monotonic() - t0
     t0 = time.monotonic()
     lab_sh("down")
@@ -106,7 +107,7 @@ def test_host_state_unchanged_and_ens33_untouched():
     lab_sh("down", check=False)
     before = host_snapshot()
     ens = ens33_state()
-    lab_sh("up")
+    lab_sh("up", "--harness")
     lab_sh("down")
     assert host_snapshot() == before
     assert ens33_state() == ens
@@ -120,7 +121,7 @@ def test_scripts_never_reference_the_host_nic():
 
 
 def test_down_removes_every_lab_object():
-    lab_sh("up")
+    lab_sh("up", "--harness")
     lab_sh("down")
     assert "mvr-" not in sh("ip", "netns", "list").stdout
     assert "mvr-" not in sh("ip", "-br", "link").stdout

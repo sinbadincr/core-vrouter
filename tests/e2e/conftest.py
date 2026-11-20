@@ -120,7 +120,7 @@ def _session_guard():
 @pytest.fixture()
 def lab():
     """Lab is up (idempotent, cheap). Tests that need the forwarder use `forwarder`."""
-    lab_sh("up")
+    lab_sh("up", "--harness")
     yield
 
 

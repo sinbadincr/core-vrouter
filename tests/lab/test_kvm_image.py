@@ -213,7 +213,7 @@ class EndToEnd(unittest.TestCase):
         cache = Path(os.environ.get("MINIVR_KVM_CACHE", ROOT / "build" / "cache" / "images"))
         self.golden = cache / self.lock["CIRROS_FILE"]
         if not self.golden.exists():
-            self.skipTest("golden image not cached yet (run: sudo make lab-kvm once)")
+            self.skipTest("golden image not cached yet (run: sudo make lab once)")
         if hashlib.sha256(self.golden.read_bytes()).hexdigest() != self.lock["CIRROS_SHA256"]:
             self.skipTest("cached golden image does not match image.lock")
 
