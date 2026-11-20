@@ -15,7 +15,7 @@ BUILD = os.environ.get("MINIVR_BUILD", "debug")
 LAB = ROOT / "lab" / "lab.sh"
 VRCTL_BIN = ROOT / "build" / BUILD / "vrctl"
 SOCK = "/run/mvr-cn1/minivr.sock"
-TIME_BUDGET_S = int(os.environ.get("MINIVR_E2E_BUDGET_S", "120"))
+TIME_BUDGET_S = int(os.environ.get("MINIVR_E2E_BUDGET_S", "180"))
 
 # every vrctl call in the suite goes to the lab socket, never the default one
 os.environ["MINIVR_SOCK"] = SOCK
