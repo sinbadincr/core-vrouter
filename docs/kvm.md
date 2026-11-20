@@ -1,7 +1,7 @@
-# KVM lab mode (phase 1.5)
+# The KVM lab (phase 1.5, default since feature 004)
 
-An opt-in lab mode where `vm1`–`vm3` are real KVM guests (CirrOS 0.6.3, virtio-net) instead of
-network namespaces. `minivrd`, `lab/cn1.conf` and `vrctl` are **unchanged**: a guest's data NIC is
+The lab (`make lab`) where `vm1`–`vm3` are real KVM guests (CirrOS 0.6.3, virtio-net). The
+namespace VMs that phase 1 used survive only as the test harness; see [lab.md](lab.md). `minivrd`, `lab/cn1.conf` and `vrctl` are **unchanged**: a guest's data NIC is
 a TAP device named `p1`–`p3` in `mvr-cn1`, which the forwarder opens with AF_PACKET like any
 other port. It is the same attachment nova/libvirt use between a VM and a vRouter on a compute node.
 
@@ -21,8 +21,8 @@ scripts/check-prereqs.sh --kvm     # exit 2 tools missing, 3 no KVM, 4 KVM not u
 ## Commands
 
 ```bash
-sudo make lab-kvm            # image fetch+verify, namespaces, TAPs, boot 3 guests, wait for ready
-sudo make lab-run            # start minivrd (same as namespace mode)
+sudo make lab                # image fetch+verify, namespaces, TAPs, boot 3 guests, wait for ready
+sudo make lab-run            # start minivrd
 sudo lab/lab.sh status       # includes a guest table: state, pid, port, MAC, addresses, console
 sudo lab/lab.sh ssh vm1      # shell in a guest over the management network (or: ssh vm1 CMD)
 lab/lab.sh console vm1 -f    # follow the guest's console log
@@ -30,9 +30,9 @@ sudo make e2e-kvm            # non-interactive suite; SKIP (exit 0) when the hos
 sudo make lab-clean          # stop guests, delete every mvr-* object, keep logs and image cache
 ```
 
-`up --kvm` is idempotent: ready guests are left alone, stopped or failed ones are rebooted on
+`lab.sh up` is idempotent: ready guests are left alone, stopped or failed ones are rebooted on
 their existing TAP, so the forwarder keeps running and the port comes back up by itself.
-`make lab` and `make lab-kvm` refuse each other until `make lab-clean`.
+`lab.sh up` and `lab.sh up --harness` refuse each other until `make lab-clean`.
 
 ## How one guest is wired
 

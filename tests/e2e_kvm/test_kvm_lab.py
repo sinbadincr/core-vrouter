@@ -39,10 +39,19 @@ def clean_start():
 
 def test_k15_no_kvm_device_exits_3_fast_and_creates_nothing():
     t0 = time.monotonic()
-    r = run_lab("up", "--kvm", env={"MINIVR_KVM_DEVICE": "/nonexistent"})
+    r = run_lab("up", env={"MINIVR_KVM_DEVICE": "/nonexistent"})
     assert r.returncode == 3
     assert time.monotonic() - t0 < 5
     assert "Virtualize Intel VT-x/EPT" in r.stderr
+    assert ("the namespace harness used by 'make e2e' needs no KVM, "
+            "but there is no lab without KVM") in r.stderr
+    assert mvr_ns() == []
+
+
+def test_old_kvm_option_prints_usage():
+    r = run_lab("up", "--kvm")
+    assert r.returncode == 2
+    assert "up [--harness]" in r.stderr
     assert mvr_ns() == []
 
 
@@ -52,7 +61,7 @@ def test_unusable_kvm_device_exits_4_and_suite_reports_fail_not_skip():
         dev.write_text("")
         os.chmod(dev, 0o600)  # owned by root: the developer cannot open it
         env = {"MINIVR_KVM_DEVICE": str(dev)}
-        r = run_lab("up", "--kvm", env=env)
+        r = run_lab("up", env=env)
         assert r.returncode == 4
         assert "not accessible" in r.stderr
         assert mvr_ns() == []
@@ -67,26 +76,26 @@ def test_corrupted_image_is_deleted_and_reported():
     with tempfile.TemporaryDirectory() as d:
         img = Path(d) / lock("CIRROS_FILE")
         img.write_bytes(b"not a disk image")
-        r = run_lab("up", "--kvm", env={"MINIVR_KVM_CACHE": d})
+        r = run_lab("up", env={"MINIVR_KVM_CACHE": d})
         assert r.returncode == 1
         assert "image checksum mismatch (deleted); re-run to download again" in r.stderr
         assert not img.exists()
 
 
-def test_kvm_up_refused_while_namespace_lab_is_up():
-    assert run_lab("up").returncode == 0
+def test_kvm_up_refused_while_harness_is_up():
+    assert run_lab("up", "--harness").returncode == 0
     try:
         before = mvr_ns()
-        r = run_lab("up", "--kvm")
+        r = run_lab("up")
         assert r.returncode == 1
-        assert "namespace lab is up; run 'sudo make lab-clean' first" in r.stderr
+        assert "namespace test harness is up; run 'sudo make lab-clean' first" in r.stderr
         assert mvr_ns() == before and "mvr-mgmt" not in before
     finally:
         run_lab("down")
 
 
 def test_not_ready_names_guest_and_console_log():
-    r = run_lab("up", "--kvm", env={"MINIVR_KVM_BOOT_TIMEOUT": "1"})
+    r = run_lab("up", env={"MINIVR_KVM_BOOT_TIMEOUT": "1"})
     assert r.returncode == 1
     assert re.search(r"vm[123] not ready after 1s; console: build/lab/kvm/logs/vm[123]\.console\.log",
                      r.stderr), r.stderr
@@ -95,11 +104,12 @@ def test_not_ready_names_guest_and_console_log():
 
 def test_k1_up_ready_in_time_with_ports():
     t0 = time.monotonic()
-    r = run_lab("up", "--kvm")
+    r = run_lab("up")
     elapsed = time.monotonic() - t0
     assert r.returncode == 0, r.stderr
     assert elapsed < 90, f"bring-up took {elapsed:.0f}s"
     st = run_lab("status").stdout
+    assert st.splitlines()[0] == "lab: kvm", st
     for vm in ("vm1", "vm2", "vm3"):
         assert re.search(rf"^{vm}\s+ready\s", st, re.M), st
     # the image layer is applied: no DHCP wait, so the console shows the patched network start
@@ -112,13 +122,13 @@ def test_k1_up_ready_in_time_with_ports():
 def test_k2_second_up_keeps_the_guests():
     before = guest_pids()
     assert len(before) == 3
-    assert run_lab("up", "--kvm").returncode == 0
+    assert run_lab("up").returncode == 0
     assert guest_pids() == before
 
 
-def test_k3_plain_up_refused_while_kvm_is_up():
+def test_k3_harness_up_refused_while_kvm_is_up():
     before = guest_pids()
-    r = run_lab("up")
+    r = run_lab("up", "--harness")
     assert r.returncode == 1
     assert "KVM lab is up; run 'sudo make lab-clean' first" in r.stderr
     assert guest_pids() == before
@@ -159,7 +169,7 @@ def test_k17_tampered_layer_is_rebuilt_and_golden_untouched():
         original = f.read(4)
         f.seek(3_000_000)
         f.write(bytes(b ^ 0xFF for b in original))
-    r = run_lab("up", "--kvm")
+    r = run_lab("up")
     assert r.returncode == 0, r.stderr
     with open(layer, "rb") as f:
         f.seek(3_000_000)

@@ -1,6 +1,6 @@
 # Thin wrapper over CMake and the lab scripts.
 PRESET ?= debug
-.PHONY: build test test-asan check lab lab-kvm lab-run lab-clean e2e e2e-kvm clean
+.PHONY: build test test-asan check lab lab-run lab-clean e2e e2e-kvm clean
 
 build:
 	cmake --preset $(PRESET) && cmake --build --preset $(PRESET) -j
@@ -15,11 +15,9 @@ test-asan:
 check:
 	scripts/check.sh
 
+# the lab: three KVM guests behind the forwarder (needs /dev/kvm)
 lab:
 	lab/lab.sh up
-
-lab-kvm:
-	lab/lab.sh up --kvm
 
 lab-run:
 	lab/lab.sh run
@@ -27,9 +25,11 @@ lab-run:
 lab-clean:
 	lab/lab.sh down
 
+# the harness suite: namespace VMs, crafted frames, no KVM needed
 e2e:
 	tests/e2e/run.sh
 
+# the KVM suite: the same lab as `make lab`
 e2e-kvm:
 	tests/e2e/run.sh --kvm
 

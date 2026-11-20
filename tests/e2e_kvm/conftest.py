@@ -92,8 +92,8 @@ def _session_guard():
 @pytest.fixture(scope="module")
 def kvm_lab():
     """KVM lab up (idempotent). Left up between modules; the session guard tears it down."""
-    r = run_lab("up", "--kvm")
-    assert r.returncode == 0, f"up --kvm failed ({r.returncode}):\n{r.stderr}"
+    r = run_lab("up")
+    assert r.returncode == 0, f"up failed ({r.returncode}):\n{r.stderr}"
     yield
 
 

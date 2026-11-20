@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# KVM lab mode building blocks, sourced by lab/lab.sh (contracts/lab-kvm.md, research R1-R11).
+# KVM lab building blocks (the default lab), sourced by lab/lab.sh (contracts/lab-kvm.md, research R1-R11).
 # Needs from lab.sh: ROOT, CN, die, ns_exists, nsx, no_offload. Everything here only creates or
 # removes mvr-* namespaces, mvr-vmN processes, /run/mvr-kvm and build/lab/kvm.
 

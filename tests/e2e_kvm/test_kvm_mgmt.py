@@ -108,8 +108,15 @@ def test_k13_killed_guest_is_stopped_and_recovers(forwarder):
     subprocess.run(["pkill", "-KILL", "-x", "mvr-vm2"], check=True)
     assert wait_for(lambda: re.search(r"^vm2\s+stopped\s", run_lab("status").stdout, re.M), 10)
     assert wait_for(lambda: port("p2")["oper"] == "down", 5)
-    r = run_lab("up", "--kvm")
+    before = common.reasons()["port_down"]
+    guest("vm1", "ping -c 2 -W 1 10.0.1.12", check=False)
+    assert common.reasons()["port_down"] > before
+    r = run_lab("up")
     assert r.returncode == 0, r.stderr
     assert re.search(r"^vm2\s+ready\s", run_lab("status").stdout, re.M)
     assert wait_for(lambda: port("p2")["oper"] == "up", 10)
+    r = guest("vm1", "ping -c 3 -W 1 10.0.1.12")
+    assert " 0% packet loss" in r.stdout, r.stdout
     assert common.forwarder_pid() == forwarder
+    time.sleep(0.2)
+    assert common.stats()["mbuf"]["in_use"] == 0

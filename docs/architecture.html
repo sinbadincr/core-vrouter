@@ -341,9 +341,9 @@ flowchart LR
     direction LR
     subgraph VMS["VM namespaces"]
       direction TB
-      vm1["<b>mvr-vm1</b><br/>eth0 10.0.1.11/24<br/>gw 10.0.1.1"]
-      vm2["<b>mvr-vm2</b><br/>eth0 10.0.1.12/24<br/>gw 10.0.1.1"]
-      vm3["<b>mvr-vm3</b><br/>eth0 10.0.2.13/24<br/>gw 10.0.2.1"]
+      vm1["<b>vm1</b> (KVM guest)<br/>eth0 10.0.1.11/24<br/>gw 10.0.1.1"]
+      vm2["<b>vm2</b> (KVM guest)<br/>eth0 10.0.1.12/24<br/>gw 10.0.1.1"]
+      vm3["<b>vm3</b> (KVM guest)<br/>eth0 10.0.2.13/24<br/>gw 10.0.2.1"]
     end
     subgraph CN1["mvr-cn1 · compute node (ip_forward=0, ports without IP)"]
       direction LR

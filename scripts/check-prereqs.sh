@@ -2,7 +2,7 @@
 # Verify the tools needed to build, test and run the lab.
 #   (no option) everything for development
 #   --e2e       only what `make e2e` itself needs (the suite crafts packets with scapy)
-#   --kvm       what the optional KVM lab mode needs, plus KVM itself (contracts/lab-kvm.md):
+#   --kvm       what the KVM lab (the default lab) needs, plus KVM itself (contracts/lab.md):
 #               exit 2 missing tools, 3 no KVM on this host, 4 KVM present but not usable by
 #               the developer ($SUDO_UID; checked only when it is set and not 0)
 set -u
@@ -39,6 +39,7 @@ if [ "$mode" = "--kvm" ]; then
         if [ "$(grep -cE 'vmx|svm' /proc/cpuinfo)" -eq 0 ]; then
             echo "  the CPU flags show no vmx/svm: hardware virtualization is off for this machine" >&2
         fi
+        echo "  the namespace harness used by 'make e2e' needs no KVM, but there is no lab without KVM" >&2
         exit 3
     fi
     uid="${SUDO_UID:-}"
