@@ -78,9 +78,11 @@ def test_k8_100mb_tcp_digest_matches():
             break
         time.sleep(1)
     assert len(sent) == 64 and recv.split()[0] == sent
+    time.sleep(0.2)
+    assert common.stats()["mbuf"]["in_use"] == 0
 
 
-def test_k10_same_binary_and_config_as_namespace_mode():
+def test_k10_same_binary_and_config_as_harness():
     pid = common.forwarder_pid()
     exe = hashlib.sha256(open(f"/proc/{pid}/exe", "rb").read()).hexdigest()
     built = hashlib.sha256((ROOT / "build" / common.BUILD / "minivrd").read_bytes()).hexdigest()
